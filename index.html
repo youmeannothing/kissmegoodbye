@@ -3,94 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kiss Me Goodbye — 조각글 서랍</title>
-  <meta name="description" content="발췌문과 조각글을 붙잡아 두는 작은 에디터">
+  <title>Kiss Me Goodbye — 조각글</title>
+  <meta name="description" content="발췌문과 조각글을 쓰는 작은 워드 프로세서">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
   <div class="sheet">
     <header>
-      <div class="t">조각글 서랍</div>
+      <div class="t">조각글</div>
       <div class="st">kiss me goodbye :: 흘러가기 전에 붙잡아 둔 문장들</div>
-      <div class="meta">
-        <span id="date-str">—</span> &nbsp;·&nbsp; 보관 중 <b id="piece-count">0</b>편
-      </div>
     </header>
 
-    <section class="grp" aria-label="에디터">
-      <div class="gh"><span id="editor-heading">쓰기</span>
-        <span class="cnt" id="draft-note" hidden>임시 저장됨</span>
-      </div>
+    <div class="grp">
+      <div class="gh"><span id="editor-heading">새 조각</span><span class="gh-note" id="draft-note" hidden>임시 저장됨</span></div>
 
-      <form id="editor-form" class="editor-form">
-        <div class="field-row">
-          <label class="field">
-            <span class="label">제목 <em>선택</em></span>
-            <input type="text" id="f-title" maxlength="60" placeholder="무제" autocomplete="off">
-          </label>
-          <label class="field">
-            <span class="label">출처 <em>선택 · 발췌문이라면</em></span>
-            <input type="text" id="f-source" maxlength="80" placeholder="예) 한강, 『흰』" autocomplete="off">
-          </label>
-        </div>
-        <div class="field">
-          <span class="label">본문</span>
-          <div class="toolbar" id="toolbar">
-            <button type="button" data-mark="**" title="굵게"><b>B</b></button>
-            <button type="button" data-mark="*" title="기울임"><i>I</i></button>
-            <button type="button" data-mark="__" title="밑줄"><u>U</u></button>
-            <button type="button" data-mark="~~" title="취소선"><s>S</s></button>
-            <button type="button" data-mark="==" class="tb-hl" title="형광펜">형광</button>
-            <span class="tb-sep" aria-hidden="true"></span>
-            <button type="button" id="file-btn" title="파일 삽입 — 이미지 또는 텍스트 파일">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-            </button>
-            <input type="file" id="f-file" accept="image/*,.txt,.md" hidden>
-          </div>
-          <textarea id="f-body" rows="9" maxlength="8000" required placeholder="붙잡아 두고 싶은 문장을 적어주세요."></textarea>
-          <span class="image-note" id="image-note" hidden>
-            <span id="image-name"></span>
-            <button type="button" id="image-remove">제거</button>
-          </span>
-          <div class="under-row">
-            <span class="hint">드래그로 선택한 뒤 버튼을 누르면 **굵게** 같은 표시가 붙고, 저장되면 꾸민 모양으로 보입니다</span>
-            <span class="char-count"><b id="char-count">0</b>자</span>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-solid" id="submit-btn">저장</button>
-          <button type="button" class="btn" id="clear-btn">비우기</button>
-          <button type="button" id="preview-btn" class="preview-btn">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-            미리보기
+      <div class="paper">
+        <div class="doc-toolbar" id="toolbar">
+          <button type="button" data-cmd="undo" title="되돌리기">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>
           </button>
+          <button type="button" data-cmd="redo" title="다시 실행">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/></svg>
+          </button>
+          <span class="tb-sep" aria-hidden="true"></span>
+          <button type="button" data-cmd="bold" title="굵게 ⌘B"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="기울임 ⌘I"><i>I</i></button>
+          <button type="button" data-cmd="underline" title="밑줄 ⌘U"><u>U</u></button>
+          <button type="button" data-cmd="strikeThrough" title="취소선"><s>S</s></button>
+          <button type="button" data-cmd="highlight" class="tb-hl" title="형광펜">형광</button>
+          <span class="tb-sep" aria-hidden="true"></span>
+          <button type="button" id="file-btn" title="파일 삽입 — 이미지는 문서 안에, txt는 커서 위치에">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="file" id="f-file" accept="image/*,.txt,.md" hidden>
+          <span class="tb-count"><b id="char-count">0</b>자</span>
         </div>
-        <div id="preview-area" class="preview-area" hidden>
-          <span class="label">미리보기 — 저장하면 아래처럼 보입니다</span>
-          <div id="preview-body" class="v-body"></div>
-        </div>
-      </form>
-    </section>
 
-    <section class="grp" aria-label="보관함">
-      <div class="gh">보관함
-        <span class="cnt">최근 것부터</span>
+        <div class="doc-page">
+          <input type="text" id="f-title" class="doc-title" maxlength="60" placeholder="무제" autocomplete="off" spellcheck="false">
+          <input type="text" id="f-source" class="doc-source" maxlength="80" placeholder="출처 — 발췌문이라면 (선택)" autocomplete="off" spellcheck="false">
+          <div id="f-body" class="doc-body" contenteditable="true" data-placeholder="붙잡아 두고 싶은 문장을 적어주세요."></div>
+        </div>
+
+        <div class="doc-status">
+          <button type="button" class="btn btn-solid" id="save-btn">저장</button>
+          <button type="button" class="btn" id="clear-btn">새로 쓰기</button>
+          <span class="status-hint">⌘S 로도 저장됩니다</span>
+        </div>
       </div>
+    </div>
+
+    <div class="grp">
+      <div class="gh">보관함<span class="gh-note"><b id="piece-count">0</b>편 · 최근 것부터</span></div>
       <ol id="piece-list" class="piece-list"></ol>
-      <p id="empty-state" class="empty">
-        아직 보관한 조각이 없습니다. 첫 문장을 붙잡아 보세요.
-      </p>
-    </section>
+      <p id="empty-state" class="empty">아직 보관한 조각이 없습니다.</p>
+    </div>
 
     <div class="corner">
-      모든 글은 이 브라우저에만 저장됩니다<br>
+      모든 글은 이 브라우저에만 저장됩니다 &nbsp;·&nbsp;
       <button type="button" id="export-btn" class="corner-link">전체 내보내기</button>
       &nbsp;·&nbsp;
       <button type="button" id="import-btn" class="corner-link">가져오기</button>
       <input type="file" id="f-import" accept=".json" hidden>
+      <br>♪ <span class="ph">&nbsp;&nbsp;Angela Aki&nbsp;&nbsp;&nbsp;—&nbsp;&nbsp;Kiss Me Good-Bye</span>
     </div>
   </div>
 
@@ -102,7 +80,6 @@
       </div>
       <button type="button" id="v-close" class="v-close" aria-label="닫기">✕</button>
     </div>
-    <img id="v-image" class="v-image" alt="" hidden>
     <div id="v-body" class="v-body"></div>
     <div class="v-actions">
       <button type="button" id="v-edit" class="btn">수정</button>
@@ -111,6 +88,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=1"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

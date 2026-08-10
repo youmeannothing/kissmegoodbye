@@ -1,46 +1,67 @@
 // ————————————————————————————————————————————
-// Kiss Me Goodbye — 조각글 서랍
-// 발췌문·조각글을 쓰고 꾸미고 보관하는 로컬 에디터.
+// Kiss Me Goodbye — 조각글
+// 발췌문·조각글을 위한 작은 워드 프로세서.
+// 종이에 바로 타이핑하고, 꾸민 모습 그대로 보관한다.
 // 모든 글은 이 브라우저(localStorage)에만 저장된다.
 // ————————————————————————————————————————————
 
 const PIECES_KEY = "kmg_pieces";
 const DRAFT_KEY = "kmg_draft";
+const HL_COLOR = "rgb(244, 231, 233)"; // --accent-fill
 
-const fmtDate = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric", weekday: "long",
-});
 const fmtStamp = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
   hour: "2-digit", minute: "2-digit", hour12: false,
 });
 
-// ——— 본문 꾸미기 (**굵게** *기울임* __밑줄__ ~~취소선~~ ==형광==) ———
+const $ = id => document.getElementById(id);
+const body = () => $("f-body");
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// ——— HTML 정리 — 허용한 꾸밈만 남긴다 ———
+
+const ALLOWED_TAGS = new Set([
+  "B", "STRONG", "I", "EM", "U", "S", "STRIKE", "DEL",
+  "MARK", "BR", "DIV", "P", "SPAN", "IMG",
+]);
+
+function cleanNode(parent) {
+  [...parent.childNodes].forEach(child => {
+    if (child.nodeType === Node.TEXT_NODE) return;
+    if (child.nodeType !== Node.ELEMENT_NODE) { child.remove(); return; }
+    cleanNode(child);
+    const tag = child.tagName;
+    if (tag === "IMG") {
+      const src = child.getAttribute("src") || "";
+      if (!src.startsWith("data:image/")) { child.remove(); return; }
+      [...child.attributes].forEach(a => { if (a.name !== "src") child.removeAttribute(a.name); });
+    } else if (ALLOWED_TAGS.has(tag)) {
+      const bg = tag === "SPAN" ? child.style.backgroundColor : "";
+      [...child.attributes].forEach(a => child.removeAttribute(a.name));
+      if (bg && bg !== "transparent") child.style.backgroundColor = bg;
+    } else {
+      while (child.firstChild) parent.insertBefore(child.firstChild, child);
+      child.remove();
+    }
+  });
 }
 
-function renderRich(text) {
-  let h = escapeHtml(text);
-  h = h
-    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/__([^_\n]+)__/g, "<u>$1</u>")
-    .replace(/~~([^~\n]+)~~/g, "<s>$1</s>")
-    .replace(/==([^=\n]+)==/g, "<mark>$1</mark>")
-    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
-  h = h.replace(/(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-  return h.replace(/\n/g, "<br>");
+function sanitizeHtml(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  cleanNode(tpl.content);
+  return tpl.innerHTML;
 }
 
-// 카드 미리보기용 — 꾸밈 표시 제거한 순수 텍스트
-function stripMarks(s) {
-  return s.replace(/(\*\*|__|~~|==|\*)/g, "");
+function htmlToText(html) {
+  const div = document.createElement("div");
+  div.innerHTML = sanitizeHtml(html)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<(div|p)(\s[^>]*)?>/gi, "\n")
+    .replace(/<\/(div|p)>/gi, "\n");
+  return div.textContent.replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// ——— 이미지 첨부: 리사이즈 + JPEG 압축 → data URL ———
+// ——— 이미지: 리사이즈 + JPEG 압축 → data URL ———
 
 function compressImage(file, maxDim = 1000, quality = 0.82) {
   return new Promise((resolve, reject) => {
@@ -69,23 +90,156 @@ async function pickImage(file) {
 
 // ——— 저장소 ———
 
+function normalizePiece(p) {
+  // 구버전(마크 문법 body) 호환 — 평문을 그대로 살린다
+  if (!p.html && typeof p.body === "string") {
+    const div = document.createElement("div");
+    div.textContent = p.body;
+    p.html = div.innerHTML.replace(/\n/g, "<br>");
+  }
+  return p;
+}
+
 function loadPieces() {
-  try { return JSON.parse(localStorage.getItem(PIECES_KEY)) || []; }
+  try { return (JSON.parse(localStorage.getItem(PIECES_KEY)) || []).map(normalizePiece); }
   catch { return []; }
 }
 function savePieces(list) {
   localStorage.setItem(PIECES_KEY, JSON.stringify(list));
 }
 
-// ——— UI 상태 ———
+let editingId = null;
 
-const $ = id => document.getElementById(id);
+// ——— 편집기 ———
 
-let pieces = [];
-let editingId = null;     // 수정 중인 글 id
-let attachedImage = null; // 첨부 이미지 data URL
+function isDocEmpty() {
+  return !body().innerText.trim() && !body().querySelector("img");
+}
 
-// ——— 목록 ———
+function updateCharCount() {
+  $("char-count").textContent = body().innerText.replace(/\n$/, "").length;
+}
+
+function exec(cmd, value = null) {
+  body().focus();
+  document.execCommand("styleWithCSS", false, false); // <b><i><u> 태그로
+  document.execCommand(cmd, false, value);
+  afterEdit();
+}
+
+function toggleHighlight() {
+  const current = document.queryCommandValue("hiliteColor");
+  body().focus();
+  document.execCommand("styleWithCSS", false, true); // 형광펜만 span 배경색으로
+  document.execCommand("hiliteColor", false, current === HL_COLOR ? "transparent" : HL_COLOR);
+  document.execCommand("styleWithCSS", false, false);
+  afterEdit();
+}
+
+// 선택 영역의 꾸밈 상태를 툴바 버튼에 반영
+function refreshToolbarState() {
+  const sel = document.getSelection();
+  const inside = sel.rangeCount && body().contains(sel.anchorNode);
+  document.querySelectorAll("#toolbar button[data-cmd]").forEach(btn => {
+    const cmd = btn.dataset.cmd;
+    if (cmd === "undo" || cmd === "redo") return;
+    let on = false;
+    if (inside) {
+      on = cmd === "highlight"
+        ? document.queryCommandValue("hiliteColor") === HL_COLOR
+        : document.queryCommandState(cmd);
+    }
+    btn.classList.toggle("on", on);
+  });
+}
+
+// ——— 임시 저장 (draft) ———
+
+function saveDraft() {
+  const draft = {
+    title: $("f-title").value,
+    source: $("f-source").value,
+    html: body().innerHTML,
+  };
+  if (!draft.title && !draft.source && isDocEmpty()) {
+    localStorage.removeItem(DRAFT_KEY);
+    $("draft-note").hidden = true;
+    return;
+  }
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    $("draft-note").hidden = false;
+  } catch { /* 저장 공간 부족 — 조용히 무시 */ }
+}
+
+function restoreDraft() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); }
+  catch { return; }
+  if (!draft) return;
+  $("f-title").value = draft.title || "";
+  $("f-source").value = draft.source || "";
+  body().innerHTML = sanitizeHtml(draft.html || "");
+  $("draft-note").hidden = false;
+}
+
+function afterEdit() {
+  updateCharCount();
+  refreshToolbarState();
+  saveDraft();
+}
+
+// ——— 저장 · 새로 쓰기 · 수정 ———
+
+function resetEditor() {
+  $("f-title").value = "";
+  $("f-source").value = "";
+  body().innerHTML = "";
+  editingId = null;
+  localStorage.removeItem(DRAFT_KEY);
+  $("draft-note").hidden = true;
+  updateCharCount();
+  $("editor-heading").textContent = "새 조각";
+  $("save-btn").textContent = "저장";
+}
+
+function savePiece() {
+  if (isDocEmpty()) { body().focus(); return; }
+  const data = {
+    title: $("f-title").value.trim(),
+    source: $("f-source").value.trim(),
+    html: sanitizeHtml(body().innerHTML),
+  };
+  try {
+    const list = loadPieces();
+    if (editingId) {
+      savePieces(list.map(p => p.id === editingId
+        ? { ...p, ...data, editedAt: Date.now() } : p));
+    } else {
+      list.push({ ...data, id: crypto.randomUUID(), createdAt: Date.now() });
+      savePieces(list);
+    }
+    resetEditor();
+    renderList();
+  } catch (err) {
+    alert("저장에 실패했습니다. 브라우저 저장 공간이 가득 찼을 수 있어요. 오래된 글이나 이미지를 정리해주세요.");
+    console.error(err);
+  }
+}
+
+function beginEdit(p) {
+  editingId = p.id;
+  $("editor-heading").textContent = `「${p.title || "무제"}」 수정 중`;
+  $("save-btn").textContent = "수정 완료";
+  $("f-title").value = p.title || "";
+  $("f-source").value = p.source || "";
+  body().innerHTML = sanitizeHtml(p.html);
+  updateCharCount();
+  document.querySelector(".paper").scrollIntoView({ behavior: "smooth", block: "center" });
+  body().focus();
+}
+
+// ——— 보관함 ———
 
 function metaText(p) {
   return (p.source ? `〔${p.source}〕 · ` : "")
@@ -94,7 +248,7 @@ function metaText(p) {
 }
 
 function renderList() {
-  pieces = loadPieces().sort((a, b) => b.createdAt - a.createdAt);
+  const pieces = loadPieces().sort((a, b) => b.createdAt - a.createdAt);
   $("piece-count").textContent = pieces.length;
   $("empty-state").hidden = pieces.length > 0;
 
@@ -106,14 +260,6 @@ function renderList() {
     li.tabIndex = 0;
     li.setAttribute("role", "button");
 
-    if (p.image) {
-      const thumb = document.createElement("img");
-      thumb.className = "card-thumb";
-      thumb.src = p.image;
-      thumb.alt = "";
-      li.appendChild(thumb);
-    }
-
     const title = document.createElement("div");
     title.className = "card-title";
     title.textContent = p.title || "(무제)";
@@ -122,11 +268,12 @@ function renderList() {
     meta.className = "card-meta";
     meta.textContent = metaText(p);
 
-    const body = document.createElement("p");
-    body.className = "card-preview";
-    body.textContent = stripMarks(p.body);
+    const preview = document.createElement("p");
+    preview.className = "card-preview";
+    const text = htmlToText(p.html).replace(/\n+/g, " ");
+    preview.textContent = text || "(이미지)";
 
-    li.append(title, meta, body);
+    li.append(title, meta, preview);
 
     const open = () => viewPiece(p);
     li.onclick = open;
@@ -135,17 +282,11 @@ function renderList() {
   });
 }
 
-// ——— 상세 보기 ———
-
 function viewPiece(p) {
   const dlg = $("view-dialog");
   $("v-title").textContent = p.title || "(무제)";
   $("v-meta").textContent = metaText(p);
-  $("v-body").innerHTML = renderRich(p.body);
-
-  const img = $("v-image");
-  img.hidden = !p.image;
-  if (p.image) img.src = p.image;
+  $("v-body").innerHTML = sanitizeHtml(p.html);
 
   $("v-edit").onclick = () => { dlg.close(); beginEdit(p); };
   $("v-download").onclick = () => downloadTxt(p);
@@ -170,7 +311,7 @@ function downloadBlob(blob, filename) {
 
 function downloadTxt(p) {
   const head = [p.title || "무제", p.source ? `— ${p.source}` : ""].filter(Boolean).join("\n");
-  const text = `${head}\n\n${p.body}\n`;
+  const text = `${head}\n\n${htmlToText(p.html)}\n`;
   const name = (p.title || "조각글").replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
   downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), `${name}.txt`);
 }
@@ -191,7 +332,9 @@ function importAll(file) {
     try {
       const incoming = JSON.parse(reader.result);
       if (!Array.isArray(incoming)) throw new Error();
-      const valid = incoming.filter(p => p && typeof p.body === "string" && p.id);
+      const valid = incoming.map(normalizePiece)
+        .filter(p => p && p.id && typeof p.html === "string")
+        .map(p => ({ ...p, html: sanitizeHtml(p.html) }));
       if (!valid.length) throw new Error();
       const current = loadPieces();
       const known = new Set(current.map(p => p.id));
@@ -207,221 +350,102 @@ function importAll(file) {
   reader.readAsText(file);
 }
 
-// ——— 임시 저장 (draft) ———
+// ——— 파일 삽입 (이미지 → 문서 안에, txt·md → 커서 위치에) ———
 
-function saveDraft() {
-  const draft = {
-    title: $("f-title").value,
-    source: $("f-source").value,
-    body: $("f-body").value,
-    image: attachedImage,
-    imageName: $("image-name").textContent,
-  };
-  if (!draft.title && !draft.source && !draft.body && !draft.image) {
-    localStorage.removeItem(DRAFT_KEY);
-    $("draft-note").hidden = true;
-    return;
-  }
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    $("draft-note").hidden = false;
-  } catch { /* 저장 공간 부족 — 조용히 무시 */ }
-}
+let savedRange = null;
 
-function restoreDraft() {
-  let draft;
-  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); }
-  catch { return; }
-  if (!draft) return;
-  $("f-title").value = draft.title || "";
-  $("f-source").value = draft.source || "";
-  $("f-body").value = draft.body || "";
-  if (draft.image) {
-    attachedImage = draft.image;
-    setImageNote(draft.imageName || "첨부 이미지");
-  }
-  $("draft-note").hidden = false;
-}
-
-function clearDraft() {
-  localStorage.removeItem(DRAFT_KEY);
-  $("draft-note").hidden = true;
-}
-
-// ——— 에디터 ———
-
-function setImageNote(name) {
-  $("image-note").hidden = !name;
-  $("image-name").textContent = name ? "🖼 " + name : "";
-}
-
-function updateCharCount() {
-  $("char-count").textContent = $("f-body").value.length;
-}
-
-function resetForm() {
-  $("editor-form").reset();
-  editingId = null;
-  attachedImage = null;
-  setImageNote(null);
-  closePreview();
-  clearDraft();
-  updateCharCount();
-  $("editor-heading").textContent = "쓰기";
-  $("submit-btn").textContent = "저장";
-}
-
-function handleSubmit(e) {
-  e.preventDefault();
-  const data = {
-    title: $("f-title").value.trim(),
-    source: $("f-source").value.trim(),
-    body: $("f-body").value.trim(),
-    image: attachedImage,
-  };
-  if (!data.body) return;
-
-  try {
-    const list = loadPieces();
-    if (editingId) {
-      savePieces(list.map(p => p.id === editingId
-        ? { ...p, ...data, editedAt: Date.now() } : p));
-    } else {
-      list.push({ ...data, id: crypto.randomUUID(), createdAt: Date.now() });
-      savePieces(list);
-    }
-    resetForm();
-    renderList();
-  } catch (err) {
-    alert("저장에 실패했습니다. 브라우저 저장 공간이 가득 찼을 수 있어요. 오래된 글이나 이미지를 정리해주세요.");
-    console.error(err);
+function rememberRange() {
+  const sel = document.getSelection();
+  if (sel.rangeCount && body().contains(sel.anchorNode)) {
+    savedRange = sel.getRangeAt(0).cloneRange();
   }
 }
 
-function beginEdit(p) {
-  editingId = p.id;
-  $("editor-heading").textContent = `「${p.title || "무제"}」 수정 중`;
-  $("submit-btn").textContent = "수정 완료";
-  $("f-title").value = p.title || "";
-  $("f-source").value = p.source || "";
-  $("f-body").value = p.body;
-  attachedImage = p.image || null;
-  setImageNote(attachedImage ? "기존 이미지 유지" : null);
-  updateCharCount();
-  updatePreview();
-  $("editor-form").scrollIntoView({ behavior: "smooth", block: "center" });
-  $("f-body").focus();
+function restoreRangeOrEnd() {
+  body().focus();
+  const sel = document.getSelection();
+  sel.removeAllRanges();
+  if (savedRange) {
+    sel.addRange(savedRange);
+  } else {
+    const range = document.createRange();
+    range.selectNodeContents(body());
+    range.collapse(false); // 커서 기억이 없으면 문서 끝에
+    sel.addRange(range);
+  }
 }
 
-// ——— 미리보기 ———
-
-function renderPreview() {
-  $("preview-body").innerHTML =
-    renderRich($("f-body").value) || '<span style="color:var(--faint)">본문이 비어 있습니다</span>';
-}
-
-function togglePreview() {
-  const area = $("preview-area");
-  if (!area.hidden) { closePreview(); return; }
-  renderPreview();
-  area.hidden = false;
-}
-
-function updatePreview() {
-  if (!$("preview-area").hidden) renderPreview();
-}
-
-function closePreview() {
-  $("preview-area").hidden = true;
-  $("preview-body").innerHTML = "";
-}
-
-// ——— 파일 삽입 (이미지 또는 .txt/.md) ———
-
-function insertAtCursor(ta, text) {
-  const { selectionStart: s, selectionEnd: en, value: v } = ta;
-  ta.value = v.slice(0, s) + text + v.slice(en);
-  const pos = s + text.length;
-  ta.focus();
-  ta.setSelectionRange(pos, pos);
-}
-
-async function handleFile(file) {
+async function insertFile(file) {
+  restoreRangeOrEnd();
   if (file.type.startsWith("image/")) {
-    attachedImage = await pickImage(file);
-    setImageNote(file.name);
-    return;
+    const data = await pickImage(file);
+    document.execCommand("insertImage", false, data);
+  } else {
+    const text = await file.text();
+    if (text.length > 20000) throw new Error("파일이 너무 깁니다. 20,000자 이하만 삽입할 수 있어요.");
+    document.execCommand("insertText", false, text);
   }
-  // 텍스트 파일 — 커서 위치에 내용 삽입
-  const text = await file.text();
-  if (text.length > 8000) throw new Error("파일이 너무 깁니다. 8,000자 이하만 삽입할 수 있어요.");
-  insertAtCursor($("f-body"), text);
-  updateCharCount();
+  afterEdit();
 }
 
 // ——— 시작 ———
 
 function main() {
-  $("date-str").textContent = fmtDate.format(new Date());
-
   renderList();
   restoreDraft();
   updateCharCount();
 
-  $("editor-form").onsubmit = handleSubmit;
-  $("clear-btn").onclick = () => {
-    if ($("f-body").value.trim() &&
-      !confirm("쓰던 내용을 비울까요? 저장하지 않은 내용은 사라집니다.")) return;
-    resetForm();
-  };
-
-  // 텍스트 꾸미기 툴바
-  $("toolbar").addEventListener("click", e => {
-    const btn = e.target.closest("button[data-mark]");
+  // 툴바 — mousedown을 막아 본문 선택이 풀리지 않게 한다
+  const toolbar = $("toolbar");
+  toolbar.addEventListener("mousedown", e => e.preventDefault());
+  toolbar.addEventListener("click", e => {
+    const btn = e.target.closest("button[data-cmd]");
     if (!btn) return;
-    const mark = btn.dataset.mark;
-    const ta = $("f-body");
-    const { selectionStart: s, selectionEnd: en, value: v } = ta;
-    const sel = v.slice(s, en) || "텍스트";
-    ta.value = v.slice(0, s) + mark + sel + mark + v.slice(en);
-    ta.focus();
-    ta.setSelectionRange(s + mark.length, s + mark.length + sel.length);
-    updatePreview();
-    saveDraft();
-    updateCharCount();
+    const cmd = btn.dataset.cmd;
+    if (cmd === "highlight") toggleHighlight();
+    else exec(cmd);
   });
 
+  document.addEventListener("selectionchange", refreshToolbarState);
+
+  // 본문 — 붙여넣기는 평문으로
+  body().addEventListener("paste", e => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    document.execCommand("insertText", false, text);
+  });
+  body().addEventListener("input", afterEdit);
+  $("f-title").addEventListener("input", saveDraft);
+  $("f-source").addEventListener("input", saveDraft);
+
   // 파일 삽입
+  $("file-btn").addEventListener("mousedown", rememberRange);
   $("file-btn").onclick = () => $("f-file").click();
   $("f-file").onchange = async e => {
     const file = e.target.files[0];
     if (!file) return;
-    try {
-      await handleFile(file);
-      updatePreview();
-      saveDraft();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      e.target.value = "";
-    }
-  };
-  $("image-remove").onclick = () => {
-    attachedImage = null;
-    setImageNote(null);
-    saveDraft();
+    try { await insertFile(file); }
+    catch (err) { alert(err.message); }
+    finally { e.target.value = ""; }
   };
 
-  $("preview-btn").onclick = togglePreview;
-  $("editor-form").addEventListener("input", () => {
-    updateCharCount();
-    updatePreview();
-    saveDraft();
+  $("save-btn").onclick = savePiece;
+  $("clear-btn").onclick = () => {
+    if (!isDocEmpty() &&
+      !confirm("쓰던 내용을 비울까요? 저장하지 않은 내용은 사라집니다.")) return;
+    resetEditor();
+  };
+
+  // ⌘S / Ctrl+S — 워드 프로세서답게
+  window.addEventListener("keydown", e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      savePiece();
+    }
   });
 
   $("v-close").onclick = () => $("view-dialog").close();
 
-  // 전체 내보내기 / 가져오기
   $("export-btn").onclick = exportAll;
   $("import-btn").onclick = () => $("f-import").click();
   $("f-import").onchange = e => {

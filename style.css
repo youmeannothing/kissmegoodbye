@@ -1,5 +1,5 @@
 /* ————————————————————————————————
-   Kiss Me Goodbye — 조각글 서랍
+   Kiss Me Goodbye — 조각글
    compact editorial · burgundy
    ———————————————————————————————— */
 
@@ -11,9 +11,9 @@
   --ghost: #b3b9bf;
   --line: #e4e7ea;
   --fill: #f4f5f6;
-  --accent: #8A2D3B;
-  --accent-dark: #6E2430;
-  --accent-fill: #F6ECEE;
+  --accent: #8A3440;
+  --accent-dark: #6E2933;
+  --accent-fill: #F4E7E9;
   --sans: 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
   --mono: 'Nanum Gothic Coding', monospace;
 }
@@ -30,6 +30,8 @@ body {
   background: #fff;
   color: var(--ink);
 }
+
+.ph { color: var(--faint); }
 
 .sheet {
   width: 100%;
@@ -54,106 +56,49 @@ body {
   text-align: center;
   font-size: 10.5px;
   color: var(--muted);
-  margin-top: 6px;
-}
-
-.meta {
-  text-align: center;
-  font-size: 10px;
-  color: var(--faint);
-  margin: 14px 0 26px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-.meta b {
-  font-weight: 700;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 9.5px;
+  margin: 6px 0 26px;
 }
 
 /* ——— groups ——— */
 
-.grp { margin-bottom: 26px; }
+.grp { margin-bottom: 22px; }
 
 .gh {
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: .26em;
   color: var(--accent);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
 }
-.gh .cnt {
+.gh-note {
   letter-spacing: 0;
   color: var(--faint);
   font-weight: 400;
   font-size: 9.5px;
 }
-
-/* ——— editor ——— */
-
-.field { display: block; margin-bottom: 12px; }
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-@media (max-width: 420px) {
-  .field-row { grid-template-columns: 1fr; gap: 0; }
-}
-
-.label {
-  display: block;
-  font-size: 9px;
+.gh-note b {
+  font-family: var(--mono);
   font-weight: 700;
-  letter-spacing: .18em;
   color: var(--muted);
-  margin-bottom: 4px;
-}
-.label em {
-  font-style: normal;
-  font-weight: 400;
-  letter-spacing: 0;
-  color: var(--faint);
-  margin-left: 4px;
 }
 
-input, textarea {
-  width: 100%;
-  background: var(--fill);
-  border: 1px solid var(--line);
-  font-family: var(--sans);
-  font-size: 11.5px;
-  line-height: 1.65;
-  color: var(--ink);
-  padding: 6px 10px;
-  border-radius: 0;
-}
-textarea { resize: vertical; }
-input:focus, textarea:focus {
-  outline: none;
-  border-color: var(--muted);
-  background: #fff;
-}
-::placeholder { color: var(--faint); opacity: 1; }
+/* ——— 워드 프로세서 ——— */
 
-.form-actions {
+.paper { border: 1px solid var(--line); }
+
+/* 툴바 — 문서 프레임 상단 */
+.doc-toolbar {
   display: flex;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-/* ——— 툴바 & 파일 삽입 ——— */
-
-.toolbar {
-  display: flex;
+  align-items: center;
   gap: 3px;
-  margin-bottom: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfb;
 }
-.toolbar button {
+.doc-toolbar button {
   font-family: var(--sans);
   font-size: 10px;
   width: 24px;
@@ -164,69 +109,103 @@ input:focus, textarea:focus {
   cursor: pointer;
   padding: 0;
 }
-.toolbar button:hover { border-color: var(--muted); }
-.toolbar .tb-hl {
+.doc-toolbar button:hover { border-color: var(--muted); }
+.doc-toolbar button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-fill);
+}
+.doc-toolbar .tb-hl {
   width: auto;
   padding: 0 7px;
   background: var(--accent-fill);
   color: var(--accent);
 }
-.toolbar button svg { display: block; margin: 0 auto; }
+.doc-toolbar button svg { display: block; margin: 0 auto; }
 .tb-sep {
   width: 1px;
   height: 14px;
   background: var(--line);
-  align-self: center;
   margin: 0 3px;
 }
-
-.under-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin-top: 4px;
-}
-.hint {
-  font-size: 9px;
-  color: var(--ghost);
-}
-.char-count {
-  flex-shrink: 0;
+.tb-count {
+  margin-left: auto;
   font-size: 9px;
   color: var(--faint);
 }
-.char-count b {
+.tb-count b {
   font-family: var(--mono);
   font-weight: 400;
   color: var(--muted);
 }
 
-.image-note {
+/* 종이 — 제목·출처·본문을 문서처럼 바로 타이핑 */
+.doc-page { padding: 22px 24px 24px; }
+
+.doc-title, .doc-source {
+  width: 100%;
+  border: none;
+  background: none;
+  font-family: var(--sans);
+  color: var(--ink);
+  padding: 0;
+}
+.doc-title:focus, .doc-source:focus, .doc-body:focus { outline: none; }
+
+.doc-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.doc-source {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.doc-title::placeholder, .doc-source::placeholder { color: var(--ghost); opacity: 1; }
+
+.doc-body {
+  min-height: 240px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  line-height: 1.85;
+  color: var(--body);
+  overflow-wrap: anywhere;
+  caret-color: var(--accent);
+}
+.doc-body:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ghost);
+  pointer-events: none;
+}
+.doc-body mark, .v-body mark, .doc-body span[style] {
+  background: var(--accent-fill);
+  color: inherit;
+  padding: 0 1px;
+}
+.doc-body img, .v-body img {
+  max-width: 100%;
+  display: block;
+  border: 1px solid var(--line);
+  margin: 8px 0;
+}
+.doc-body ::selection { background: var(--accent-fill); }
+
+/* 상태 표시줄 — 문서 프레임 하단 */
+.doc-status {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 10px;
-  color: var(--body);
-  background: var(--fill);
-  border: 1px solid var(--line);
-  padding: 4px 10px;
-  margin-top: 4px;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--line);
+  background: #fafbfb;
 }
-.image-note #image-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.image-note button {
-  background: none;
-  border: none;
-  font-size: 9.5px;
-  color: var(--accent);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
+.status-hint {
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--ghost);
 }
 
 .btn {
@@ -236,7 +215,7 @@ input:focus, textarea:focus {
   background: #fff;
   border: 1px solid var(--line);
   color: var(--body);
-  padding: 6px 16px;
+  padding: 5px 14px;
   cursor: pointer;
 }
 .btn:hover { border-color: var(--muted); }
@@ -248,64 +227,27 @@ input:focus, textarea:focus {
 .btn-solid:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 .btn-danger:hover { border-color: var(--accent); color: var(--accent); }
 
-/* ——— 미리보기 ——— */
-
-.preview-btn {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: none;
-  border: none;
-  font-family: var(--sans);
-  font-size: 10.5px;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 6px 0;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.preview-btn:hover { color: var(--accent); }
-.preview-btn svg { flex-shrink: 0; }
-
-.preview-area {
-  margin-top: 14px;
-  border-top: 1px dashed var(--line);
-  padding-top: 10px;
-}
-.preview-area .label { margin-bottom: 8px; }
-
 /* ——— 보관함 ——— */
 
 .piece-list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .card {
   border: 1px solid var(--line);
-  padding: 12px 14px;
+  padding: 11px 14px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   transition: border-color .12s;
 }
 .card:hover, .card:focus-visible {
   border-color: var(--muted);
   outline: none;
-}
-
-.card-thumb {
-  width: calc(100% + 28px);
-  margin: -12px -14px 6px;
-  height: 96px;
-  object-fit: cover;
-  display: block;
-  background: var(--fill);
-  border-bottom: 1px solid var(--line);
 }
 
 .card-title {
@@ -321,9 +263,10 @@ input:focus, textarea:focus {
   font-size: 9.5px;
   color: var(--faint);
 }
-.card-meta i {
-  font-style: normal;
-  color: var(--muted);
+.card-meta b {
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: 9px;
 }
 
 .card-preview {
@@ -331,9 +274,18 @@ input:focus, textarea:focus {
   line-height: 1.6;
   color: var(--body);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.empty {
+  font-size: 11px;
+  color: var(--faint);
+  padding: 20px 0;
+  text-align: center;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 /* ——— view dialog ——— */
@@ -356,7 +308,7 @@ input:focus, textarea:focus {
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .v-title {
@@ -370,10 +322,6 @@ input:focus, textarea:focus {
   color: var(--faint);
   margin-top: 3px;
 }
-.v-meta i {
-  font-style: normal;
-  color: var(--muted);
-}
 
 .v-close {
   background: none;
@@ -386,28 +334,15 @@ input:focus, textarea:focus {
 }
 .v-close:hover { color: var(--ink); }
 
-.v-image {
-  width: 100%;
-  display: block;
-  border: 1px solid var(--line);
-  margin-bottom: 12px;
-}
-
 .v-body {
   font-size: 11.5px;
-  line-height: 1.75;
+  line-height: 1.85;
   color: var(--body);
-}
-.v-body mark {
-  background: var(--accent-fill);
-  color: inherit;
-  padding: 0 2px;
-}
-.v-body a {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
   overflow-wrap: anywhere;
+}
+.v-body span[style] {
+  background: var(--accent-fill);
+  padding: 0 1px;
 }
 
 .v-actions {
@@ -419,23 +354,14 @@ input:focus, textarea:focus {
 }
 .v-actions .btn-danger { margin-left: auto; }
 
-.empty {
-  font-size: 11px;
-  color: var(--faint);
-  padding: 22px 0;
-  text-align: center;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
 /* ——— corner ——— */
 
 .corner {
   text-align: right;
   font-size: 9px;
   color: var(--ghost);
-  margin-top: 18px;
-  line-height: 1.7;
+  margin-top: 16px;
+  line-height: 1.9;
 }
 .corner-link {
   background: none;
