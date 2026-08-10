@@ -65,6 +65,7 @@ function cleanNode(parent) {
       const lsp = isSpan ? child.style.letterSpacing : "";
       const align = isBlock
         ? (child.style.textAlign || child.getAttribute("align") || "") : "";
+      const lht = isBlock ? child.style.lineHeight : "";
       const left = isTbox ? child.style.left : "";
       const top = isTbox ? child.style.top : "";
       const w = isTbox ? child.style.width : "";
@@ -76,6 +77,7 @@ function cleanNode(parent) {
       if (/^(#[0-9a-f]{3,8}|rgba?\([\d.,\s]+\))$/i.test(color)) child.style.color = color;
       if (/^-?\d+(\.\d+)?(em|px)$/.test(lsp)) child.style.letterSpacing = lsp;
       if (/^(left|center|right|justify)$/.test(align)) child.style.textAlign = align;
+      if (/^\d+(\.\d+)?$/.test(lht)) child.style.lineHeight = lht;
       if (isTbox) {
         child.className = "tbox";
         if (/^-?\d+(\.\d+)?px$/.test(left)) child.style.left = left;
@@ -272,6 +274,25 @@ function syncDocInputs() {
   $("width-input").value = docStyle.width || "";
   $("lh-input").value = docStyle.lh;
   $("ls-input").value = docStyle.ls;
+}
+
+// 최상위에 흩어진 인라인 노드들(첫 줄 등)을 문단 div로 묶는다 — 문단 단위 스타일을 걸기 위해
+function wrapInlineRuns() {
+  const isBlockEl = n => n.nodeType === Node.ELEMENT_NODE && /^(DIV|P)$/.test(n.tagName);
+  let run = [];
+  const flush = before => {
+    if (run.length && !run.every(n => n.nodeType === Node.TEXT_NODE && !n.textContent.trim())) {
+      const div = document.createElement("div");
+      body().insertBefore(div, before);
+      run.forEach(n => div.appendChild(n));
+    }
+    run = [];
+  };
+  [...body().childNodes].forEach(n => {
+    if (isBlockEl(n)) flush(n);
+    else run.push(n);
+  });
+  flush(null);
 }
 
 // 상자가 속한 페이지의 시작 y — 상자 앞의 마지막 페이지 나눔 아래쪽
@@ -839,27 +860,61 @@ function main() {
     applyDocStyle();
     saveDraft();
   };
-  $("lh-input").onchange = e => {
-    const v = Math.min(5, Math.max(0.5, parseFloat(e.target.value) || 1.85));
-    docStyle.lh = String(v);
-    e.target.value = v;
-    applyDocStyle();
-    saveDraft();
+  // 줄간 — 선택이 걸친 문단들에만, 선택이 없으면 문서 전체에
+  const lhInput = $("lh-input");
+  let lhBlocks = null;
+  const captureLhBlocks = () => {
+    const sel = document.getSelection();
+    lhBlocks = null;
+    if (!sel.rangeCount || sel.isCollapsed || !body().contains(sel.anchorNode)) return;
+    wrapInlineRuns();
+    const range = sel.getRangeAt(0);
+    const blocks = [...body().children].filter(el =>
+      /^(DIV|P)$/.test(el.tagName) &&
+      !el.classList.contains("pgbr") && !el.classList.contains("tbox") &&
+      range.intersectsNode(el));
+    if (blocks.length) lhBlocks = blocks;
+  };
+  lhInput.addEventListener("mousedown", captureLhBlocks);
+  lhInput.addEventListener("focus", captureLhBlocks);
+  const applyLh = () => {
+    const raw = parseFloat(lhInput.value);
+    if (isNaN(raw)) return; // 입력 중간 상태는 무시
+    const v = Math.min(5, Math.max(0.5, raw));
+    if (lhBlocks && lhBlocks.every(el => el.isConnected)) {
+      lhBlocks.forEach(el => { el.style.lineHeight = String(v); });
+      afterEdit();
+    } else {
+      docStyle.lh = String(v);
+      applyDocStyle();
+      saveDraft();
+    }
+  };
+  lhInput.addEventListener("input", applyLh);
+  lhInput.onchange = () => {
+    if (isNaN(parseFloat(lhInput.value))) lhInput.value = docStyle.lh;
   };
   // 자간 — 드래그로 선택해 둔 부분이 있으면 그 부분에만, 없으면 문서 전체에
+  // 선택 부분은 적용 후에도 계속 선택 상태로 남아 스피너로 연속 조정할 수 있다
   const lsInput = $("ls-input");
-  let lsRange = null;
+  let lsRange = null;   // 새로 잡은 선택 영역
+  let lsSession = null; // 이번 조정에서 만든 span — 연속 조정 시 이 span만 갱신
   const captureLsRange = () => {
     const sel = document.getSelection();
+    // 직전에 만든 span이 그대로 선택돼 있으면 세션 유지 (span 중첩 방지)
+    const inSession = lsSession && lsSession.isConnected && sel.rangeCount &&
+      lsSession.contains(sel.anchorNode) && lsSession.contains(sel.focusNode);
+    if (inSession) return;
+    lsSession = null; // 선택이 다른 곳으로 옮겨갔으면 이전 세션은 끝
     lsRange = (sel.rangeCount && !sel.isCollapsed && body().contains(sel.anchorNode))
       ? sel.getRangeAt(0).cloneRange() : null;
   };
   lsInput.addEventListener("mousedown", captureLsRange);
-  lsInput.addEventListener("focus", () => { if (!lsRange) captureLsRange(); });
-  lsInput.onchange = e => {
-    const raw = parseFloat(e.target.value);
-    const v = Math.min(1, Math.max(-0.5, isNaN(raw) ? 0 : raw));
-    e.target.value = v;
+  lsInput.addEventListener("focus", captureLsRange);
+  const applyLs = () => {
+    const raw = parseFloat(lsInput.value);
+    if (isNaN(raw)) return; // 입력 중간 상태는 무시
+    const v = Math.min(1, Math.max(-0.5, raw));
     if (lsRange) {
       const span = document.createElement("span");
       span.style.letterSpacing = v + "em";
@@ -867,13 +922,26 @@ function main() {
       try { range.surroundContents(span); }
       catch { span.appendChild(range.extractContents()); range.insertNode(span); }
       lsRange = null;
-      e.target.value = docStyle.ls; // 입력칸은 문서 기본값 표시로 복귀
+      lsSession = span;
+      // 적용한 부분을 계속 선택 상태로 보여준다
+      const sel = document.getSelection();
+      const r = document.createRange();
+      r.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      afterEdit();
+    } else if (lsSession && lsSession.isConnected) {
+      lsSession.style.letterSpacing = v + "em";
       afterEdit();
     } else {
       docStyle.ls = String(v);
       applyDocStyle();
       saveDraft();
     }
+  };
+  lsInput.addEventListener("input", applyLs);
+  lsInput.onchange = () => {
+    if (isNaN(parseFloat(lsInput.value))) lsInput.value = docStyle.ls;
   };
 
   document.addEventListener("selectionchange", refreshToolbarState);
