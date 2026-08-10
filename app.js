@@ -530,7 +530,7 @@ function renderViewBody() {
   const vb = $("v-body");
   // 배포 직후 캐시가 어긋나 옛 HTML이 남아 있어도 상세보기 자체는 열리게 방어
   const nav = $("v-pagenav");
-  const flip = !!nav && viewMode === "flip" && viewPages.length > 1;
+  const flip = !!nav && viewMode === "flip";
   vb.innerHTML = flip ? viewPages[viewPageIdx] : viewPages.join('<div class="pgbr"></div>');
   if (nav) nav.hidden = !flip;
   if (flip) {
@@ -550,7 +550,7 @@ function viewPiece(p) {
   viewPages = splitPages(sanitizeHtml(p.html));
   viewPageIdx = 0;
   const vmode = $("v-mode");
-  if (vmode) vmode.hidden = viewPages.length < 2;
+  if (vmode) vmode.hidden = false; // 토글은 항상 표시 — 나눔 없는 글은 1/1
   vb.style.lineHeight = p.lh || "1.85";
   vb.style.letterSpacing = (p.ls || "0") + "em";
   dlg.style.width = p.width
