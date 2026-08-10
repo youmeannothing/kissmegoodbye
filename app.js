@@ -1,7 +1,7 @@
 // ————————————————————————————————————————————
 // Kiss Me Goodbye — 조각글
 // 발췌문·조각글을 위한 작은 워드 프로세서.
-// 종이에 바로 타이핑하고, 꾸민 모습 그대로 보관한다.
+// 백지 한 장 — 처음부터 끝까지 유저가 쓴다.
 // 모든 글은 이 브라우저(localStorage)에만 저장된다.
 // ————————————————————————————————————————————
 
@@ -61,6 +61,18 @@ function htmlToText(html) {
   return div.textContent.replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// 문서 첫 줄 = 목록에서 보이는 제목 (워드 프로세서처럼 문서에서 따온다)
+function pieceTitle(p) {
+  const first = htmlToText(p.html).split("\n").find(l => l.trim());
+  return first ? first.trim().slice(0, 60) : "무제";
+}
+
+function pieceRest(p) {
+  const lines = htmlToText(p.html).split("\n");
+  const i = lines.findIndex(l => l.trim());
+  return lines.slice(i + 1).join(" ").trim();
+}
+
 // ——— 이미지: 리사이즈 + JPEG 압축 → data URL ———
 
 function compressImage(file, maxDim = 1000, quality = 0.82) {
@@ -91,11 +103,20 @@ async function pickImage(file) {
 // ——— 저장소 ———
 
 function normalizePiece(p) {
-  // 구버전(마크 문법 body) 호환 — 평문을 그대로 살린다
+  // 구버전 호환 — 제목·출처 칸이 있던 시절의 데이터는 문서 첫 줄로 접어 넣는다
   if (!p.html && typeof p.body === "string") {
     const div = document.createElement("div");
     div.textContent = p.body;
     p.html = div.innerHTML.replace(/\n/g, "<br>");
+  }
+  if (p.title || p.source) {
+    const div = document.createElement("div");
+    div.textContent = p.title || "";
+    const head = (p.title ? `<b>${div.innerHTML}</b><br>` : "");
+    div.textContent = p.source || "";
+    const src = (p.source ? `${div.innerHTML}<br>` : "");
+    p.html = head + src + (head || src ? "<br>" : "") + (p.html || "");
+    delete p.title; delete p.source;
   }
   return p;
 }
@@ -156,18 +177,13 @@ function refreshToolbarState() {
 // ——— 임시 저장 (draft) ———
 
 function saveDraft() {
-  const draft = {
-    title: $("f-title").value,
-    source: $("f-source").value,
-    html: body().innerHTML,
-  };
-  if (!draft.title && !draft.source && isDocEmpty()) {
+  if (isDocEmpty()) {
     localStorage.removeItem(DRAFT_KEY);
     $("draft-note").hidden = true;
     return;
   }
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ html: body().innerHTML }));
     $("draft-note").hidden = false;
   } catch { /* 저장 공간 부족 — 조용히 무시 */ }
 }
@@ -177,25 +193,14 @@ function restoreDraft() {
   try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY)); }
   catch { return; }
   if (!draft) return;
-  $("f-title").value = draft.title || "";
-  $("f-source").value = draft.source || "";
   body().innerHTML = sanitizeHtml(draft.html || "");
-  $("draft-note").hidden = false;
+  $("draft-note").hidden = isDocEmpty();
 }
 
 // ——— 실시간 미리보기 ———
 
 function renderPreviewPane() {
-  const title = $("f-title").value.trim();
-  const source = $("f-source").value.trim();
-  const t = $("p-title");
-  t.textContent = title || "무제";
-  t.classList.toggle("ph", !title);
-  $("p-meta").textContent =
-    (source ? `〔${source}〕 · ` : "") + fmtStamp.format(new Date());
-  $("p-body").innerHTML = isDocEmpty()
-    ? '<span class="ph">본문이 아직 비어 있습니다.</span>'
-    : sanitizeHtml(body().innerHTML);
+  $("p-body").innerHTML = isDocEmpty() ? "" : sanitizeHtml(body().innerHTML);
 }
 
 function afterEdit() {
@@ -208,32 +213,25 @@ function afterEdit() {
 // ——— 저장 · 새로 쓰기 · 수정 ———
 
 function resetEditor() {
-  $("f-title").value = "";
-  $("f-source").value = "";
   body().innerHTML = "";
   editingId = null;
   localStorage.removeItem(DRAFT_KEY);
   $("draft-note").hidden = true;
   updateCharCount();
   renderPreviewPane();
-  $("editor-heading").textContent = "새 조각";
   $("save-btn").textContent = "저장";
 }
 
 function savePiece() {
   if (isDocEmpty()) { body().focus(); return; }
-  const data = {
-    title: $("f-title").value.trim(),
-    source: $("f-source").value.trim(),
-    html: sanitizeHtml(body().innerHTML),
-  };
+  const html = sanitizeHtml(body().innerHTML);
   try {
     const list = loadPieces();
     if (editingId) {
       savePieces(list.map(p => p.id === editingId
-        ? { ...p, ...data, editedAt: Date.now() } : p));
+        ? { ...p, html, editedAt: Date.now() } : p));
     } else {
-      list.push({ ...data, id: crypto.randomUUID(), createdAt: Date.now() });
+      list.push({ html, id: crypto.randomUUID(), createdAt: Date.now() });
       savePieces(list);
     }
     resetEditor();
@@ -246,10 +244,7 @@ function savePiece() {
 
 function beginEdit(p) {
   editingId = p.id;
-  $("editor-heading").textContent = `「${p.title || "무제"}」 수정 중`;
   $("save-btn").textContent = "수정 완료";
-  $("f-title").value = p.title || "";
-  $("f-source").value = p.source || "";
   body().innerHTML = sanitizeHtml(p.html);
   updateCharCount();
   renderPreviewPane();
@@ -260,9 +255,7 @@ function beginEdit(p) {
 // ——— 보관함 ———
 
 function metaText(p) {
-  return (p.source ? `〔${p.source}〕 · ` : "")
-    + fmtStamp.format(new Date(p.createdAt))
-    + (p.editedAt ? " (수정됨)" : "");
+  return fmtStamp.format(new Date(p.createdAt)) + (p.editedAt ? " (수정됨)" : "");
 }
 
 function renderList() {
@@ -280,18 +273,21 @@ function renderList() {
 
     const title = document.createElement("div");
     title.className = "card-title";
-    title.textContent = p.title || "(무제)";
+    title.textContent = pieceTitle(p);
 
     const meta = document.createElement("div");
     meta.className = "card-meta";
     meta.textContent = metaText(p);
 
-    const preview = document.createElement("p");
-    preview.className = "card-preview";
-    const text = htmlToText(p.html).replace(/\n+/g, " ");
-    preview.textContent = text || "(이미지)";
+    li.append(title, meta);
 
-    li.append(title, meta, preview);
+    const rest = pieceRest(p);
+    if (rest) {
+      const preview = document.createElement("p");
+      preview.className = "card-preview";
+      preview.textContent = rest;
+      li.appendChild(preview);
+    }
 
     const open = () => viewPiece(p);
     li.onclick = open;
@@ -302,14 +298,13 @@ function renderList() {
 
 function viewPiece(p) {
   const dlg = $("view-dialog");
-  $("v-title").textContent = p.title || "(무제)";
   $("v-meta").textContent = metaText(p);
   $("v-body").innerHTML = sanitizeHtml(p.html);
 
   $("v-edit").onclick = () => { dlg.close(); beginEdit(p); };
   $("v-download").onclick = () => downloadTxt(p);
   $("v-del").onclick = () => {
-    if (!confirm(`「${p.title || "무제"}」을(를) 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    if (!confirm(`「${pieceTitle(p)}」을(를) 삭제할까요? 되돌릴 수 없습니다.`)) return;
     dlg.close();
     savePieces(loadPieces().filter(x => x.id !== p.id));
     renderList();
@@ -328,9 +323,8 @@ function downloadBlob(blob, filename) {
 }
 
 function downloadTxt(p) {
-  const head = [p.title || "무제", p.source ? `— ${p.source}` : ""].filter(Boolean).join("\n");
-  const text = `${head}\n\n${htmlToText(p.html)}\n`;
-  const name = (p.title || "조각글").replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
+  const text = htmlToText(p.html) + "\n";
+  const name = pieceTitle(p).replace(/[\\/:*?"<>|]/g, "_").slice(0, 40) || "조각글";
   downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), `${name}.txt`);
 }
 
@@ -434,8 +428,6 @@ function main() {
     document.execCommand("insertText", false, text);
   });
   body().addEventListener("input", afterEdit);
-  $("f-title").addEventListener("input", () => { renderPreviewPane(); saveDraft(); });
-  $("f-source").addEventListener("input", () => { renderPreviewPane(); saveDraft(); });
 
   // 파일 삽입
   $("file-btn").addEventListener("mousedown", rememberRange);

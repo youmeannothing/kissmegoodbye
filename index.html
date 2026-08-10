@@ -7,7 +7,7 @@
   <meta name="description" content="발췌문과 조각글을 쓰는 작은 워드 프로세서">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -18,8 +18,6 @@
     </header>
 
     <div class="grp">
-      <div class="gh"><span id="editor-heading">새 조각</span><span class="gh-note" id="draft-note" hidden>임시 저장됨</span></div>
-
       <div class="workspace">
       <div class="paper">
         <div class="doc-toolbar" id="toolbar">
@@ -43,26 +41,18 @@
           <span class="tb-count"><b id="char-count">0</b>자</span>
         </div>
 
-        <div class="doc-page">
-          <input type="text" id="f-title" class="doc-title" maxlength="60" placeholder="무제" autocomplete="off" spellcheck="false">
-          <input type="text" id="f-source" class="doc-source" maxlength="80" placeholder="출처 — 발췌문이라면 (선택)" autocomplete="off" spellcheck="false">
-          <div id="f-body" class="doc-body" contenteditable="true" data-placeholder="붙잡아 두고 싶은 문장을 적어주세요."></div>
-        </div>
+        <div id="f-body" class="doc-body" contenteditable="true"></div>
 
         <div class="doc-status">
           <button type="button" class="btn btn-solid" id="save-btn">저장</button>
           <button type="button" class="btn" id="clear-btn">새로 쓰기</button>
-          <span class="status-hint">⌘S 로도 저장됩니다</span>
+          <span class="status-hint"><span id="draft-note" hidden>임시 저장됨 &nbsp;·&nbsp; </span>⌘S 로도 저장됩니다</span>
         </div>
       </div>
 
       <aside class="paper preview-pane" aria-label="미리보기">
         <div class="pv-bar">미리보기<span class="pv-note">저장하면 이렇게 보입니다</span></div>
-        <div class="pv-page">
-          <div id="p-title" class="pv-title ph">무제</div>
-          <div id="p-meta" class="pv-meta"></div>
-          <div id="p-body" class="v-body"></div>
-        </div>
+        <div id="p-body" class="pv-page v-body"></div>
       </aside>
       </div>
     </div>
@@ -85,10 +75,7 @@
 
   <dialog id="view-dialog" class="view-dialog">
     <div class="v-head">
-      <div>
-        <h3 id="v-title" class="v-title"></h3>
-        <div id="v-meta" class="v-meta"></div>
-      </div>
+      <div id="v-meta" class="v-meta"></div>
       <button type="button" id="v-close" class="v-close" aria-label="닫기">✕</button>
     </div>
     <div id="v-body" class="v-body"></div>
@@ -99,6 +86,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

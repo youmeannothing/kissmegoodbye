@@ -103,47 +103,6 @@ body {
 
 .paper { border: 1px solid var(--line); }
 
-/* ——— 미리보기 창 ——— */
-
-.pv-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 36px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--line);
-  background: #fafbfb;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .22em;
-  color: var(--muted);
-}
-.pv-note {
-  font-weight: 400;
-  letter-spacing: 0;
-  font-size: 9px;
-  color: var(--ghost);
-}
-
-.pv-page { padding: 22px 24px 24px; }
-
-.pv-title {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: var(--ink);
-}
-.pv-title.ph { color: var(--ghost); }
-
-.pv-meta {
-  font-size: 9.5px;
-  color: var(--faint);
-  margin-top: 3px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 12px;
-}
-
 /* 툴바 — 문서 프레임 상단 */
 .doc-toolbar {
   display: flex;
@@ -194,47 +153,18 @@ body {
   color: var(--muted);
 }
 
-/* 종이 — 제목·출처·본문을 문서처럼 바로 타이핑 */
-.doc-page { padding: 22px 24px 24px; }
-
-.doc-title, .doc-source {
-  width: 100%;
-  border: none;
-  background: none;
-  font-family: var(--sans);
-  color: var(--ink);
-  padding: 0;
-}
-.doc-title:focus, .doc-source:focus, .doc-body:focus { outline: none; }
-
-.doc-title {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-.doc-source {
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 3px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-}
-.doc-title::placeholder, .doc-source::placeholder { color: var(--ghost); opacity: 1; }
-
+/* 종이 — 아무것도 없는 백지 */
 .doc-body {
-  min-height: 240px;
-  margin-top: 12px;
+  min-height: 380px;
+  padding: 26px 28px;
   font-size: 11.5px;
   line-height: 1.85;
   color: var(--body);
   overflow-wrap: anywhere;
   caret-color: var(--accent);
+  cursor: text;
 }
-.doc-body:empty::before {
-  content: attr(data-placeholder);
-  color: var(--ghost);
-  pointer-events: none;
-}
+.doc-body:focus { outline: none; }
 .doc-body mark, .v-body mark, .doc-body span[style] {
   background: var(--accent-fill);
   color: inherit;
@@ -282,6 +212,30 @@ body {
 .btn-solid:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 .btn-danger:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ——— 미리보기 창 ——— */
+
+.pv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfb;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  color: var(--muted);
+}
+.pv-note {
+  font-weight: 400;
+  letter-spacing: 0;
+  font-size: 9px;
+  color: var(--ghost);
+}
+
+.pv-page { padding: 26px 28px; }
+
 /* ——— 보관함 ——— */
 
 .piece-list {
@@ -317,11 +271,6 @@ body {
 .card-meta {
   font-size: 9.5px;
   color: var(--faint);
-}
-.card-meta b {
-  font-family: var(--mono);
-  font-weight: 400;
-  font-size: 9px;
 }
 
 .card-preview {
@@ -361,21 +310,16 @@ body {
 .v-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
-}
-
-.v-title {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.4;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
 }
 
 .v-meta {
   font-size: 9.5px;
   color: var(--faint);
-  margin-top: 3px;
 }
 
 .v-close {
