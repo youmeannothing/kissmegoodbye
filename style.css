@@ -1,0 +1,451 @@
+/* ————————————————————————————————
+   Kiss Me Goodbye — 조각글 서랍
+   compact editorial · burgundy
+   ———————————————————————————————— */
+
+:root {
+  --ink: #1c2127;
+  --body: #3c434b;
+  --muted: #8b939c;
+  --faint: #a6adb5;
+  --ghost: #b3b9bf;
+  --line: #e4e7ea;
+  --fill: #f4f5f6;
+  --accent: #8A2D3B;
+  --accent-dark: #6E2430;
+  --accent-fill: #F6ECEE;
+  --sans: 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+  --mono: 'Nanum Gothic Coding', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  font-family: var(--sans);
+  background: #fff;
+  color: var(--ink);
+}
+
+.sheet {
+  width: 100%;
+  max-width: 500px;
+  padding: 42px 48px 38px;
+}
+@media (max-width: 520px) {
+  .sheet { padding: 34px 24px 30px; }
+}
+
+/* ——— header ——— */
+
+.t {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .5em;
+  text-indent: .5em; /* 자간 보정 — 가운데 정렬 유지 */
+}
+
+.st {
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.meta {
+  text-align: center;
+  font-size: 10px;
+  color: var(--faint);
+  margin: 14px 0 26px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.meta b {
+  font-weight: 700;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9.5px;
+}
+
+/* ——— groups ——— */
+
+.grp { margin-bottom: 26px; }
+
+.gh {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .26em;
+  color: var(--accent);
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.gh .cnt {
+  letter-spacing: 0;
+  color: var(--faint);
+  font-weight: 400;
+  font-size: 9.5px;
+}
+
+/* ——— editor ——— */
+
+.field { display: block; margin-bottom: 12px; }
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 420px) {
+  .field-row { grid-template-columns: 1fr; gap: 0; }
+}
+
+.label {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.label em {
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--faint);
+  margin-left: 4px;
+}
+
+input, textarea {
+  width: 100%;
+  background: var(--fill);
+  border: 1px solid var(--line);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 0;
+}
+textarea { resize: vertical; }
+input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--muted);
+  background: #fff;
+}
+::placeholder { color: var(--faint); opacity: 1; }
+
+.form-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* ——— 툴바 & 파일 삽입 ——— */
+
+.toolbar {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.toolbar button {
+  font-family: var(--sans);
+  font-size: 10px;
+  width: 24px;
+  height: 22px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--body);
+  cursor: pointer;
+  padding: 0;
+}
+.toolbar button:hover { border-color: var(--muted); }
+.toolbar .tb-hl {
+  width: auto;
+  padding: 0 7px;
+  background: var(--accent-fill);
+  color: var(--accent);
+}
+.toolbar button svg { display: block; margin: 0 auto; }
+.tb-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--line);
+  align-self: center;
+  margin: 0 3px;
+}
+
+.under-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 4px;
+}
+.hint {
+  font-size: 9px;
+  color: var(--ghost);
+}
+.char-count {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--faint);
+}
+.char-count b {
+  font-family: var(--mono);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.image-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--body);
+  background: var(--fill);
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  margin-top: 4px;
+}
+.image-note #image-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.image-note button {
+  background: none;
+  border: none;
+  font-size: 9.5px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btn {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--body);
+  padding: 6px 16px;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--muted); }
+.btn-solid {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-solid:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn-danger:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ——— 미리보기 ——— */
+
+.preview-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.preview-btn:hover { color: var(--accent); }
+.preview-btn svg { flex-shrink: 0; }
+
+.preview-area {
+  margin-top: 14px;
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+}
+.preview-area .label { margin-bottom: 8px; }
+
+/* ——— 보관함 ——— */
+
+.piece-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color .12s;
+}
+.card:hover, .card:focus-visible {
+  border-color: var(--muted);
+  outline: none;
+}
+
+.card-thumb {
+  width: calc(100% + 28px);
+  margin: -12px -14px 6px;
+  height: 96px;
+  object-fit: cover;
+  display: block;
+  background: var(--fill);
+  border-bottom: 1px solid var(--line);
+}
+
+.card-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-meta {
+  font-size: 9.5px;
+  color: var(--faint);
+}
+.card-meta i {
+  font-style: normal;
+  color: var(--muted);
+}
+
+.card-preview {
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--body);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ——— view dialog ——— */
+
+.view-dialog {
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 24px 26px;
+  width: min(430px, 90vw);
+  max-height: 82vh;
+  overflow-y: auto;
+  margin: auto;
+  font-family: var(--sans);
+  color: var(--ink);
+}
+.view-dialog::backdrop { background: rgba(28, 33, 39, 0.3); }
+
+.v-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.v-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.v-meta {
+  font-size: 9.5px;
+  color: var(--faint);
+  margin-top: 3px;
+}
+.v-meta i {
+  font-style: normal;
+  color: var(--muted);
+}
+
+.v-close {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+}
+.v-close:hover { color: var(--ink); }
+
+.v-image {
+  width: 100%;
+  display: block;
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+
+.v-body {
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: var(--body);
+}
+.v-body mark {
+  background: var(--accent-fill);
+  color: inherit;
+  padding: 0 2px;
+}
+.v-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.v-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.v-actions .btn-danger { margin-left: auto; }
+
+.empty {
+  font-size: 11px;
+  color: var(--faint);
+  padding: 22px 0;
+  text-align: center;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ——— corner ——— */
+
+.corner {
+  text-align: right;
+  font-size: 9px;
+  color: var(--ghost);
+  margin-top: 18px;
+  line-height: 1.7;
+}
+.corner-link {
+  background: none;
+  border: none;
+  font-family: var(--sans);
+  font-size: 9px;
+  color: var(--ghost);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.corner-link:hover { color: var(--accent); }
