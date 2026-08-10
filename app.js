@@ -219,6 +219,15 @@ function applyHighlight(color) {
   afterEdit();
 }
 
+// 직접 고른 색은 토글 없이 그대로 칠한다
+function applyHighlightColor(color) {
+  restoreRangeOrEnd();
+  document.execCommand("styleWithCSS", false, true);
+  document.execCommand("hiliteColor", false, color);
+  document.execCommand("styleWithCSS", false, false);
+  afterEdit();
+}
+
 function applyForeColor(color) {
   body().focus();
   document.execCommand("styleWithCSS", false, true);
@@ -642,6 +651,25 @@ function main() {
       $("hl-palette").hidden = true;
       $("fc-palette").hidden = true;
     }
+  });
+
+  // 직접 고르기 (컬러 휠) — 피커를 열기 전 선택 영역을 기억해 두고, 고르는 대로 실시간 적용
+  const wireCustomColor = (inputId, paletteId, apply) => {
+    const inp = $(inputId);
+    inp.addEventListener("mousedown", rememberRange);
+    inp.addEventListener("input", () => apply(inp.value));
+    inp.addEventListener("change", () => {
+      apply(inp.value);
+      $(paletteId).hidden = true;
+    });
+  };
+  wireCustomColor("hl-color", "hl-palette", c => applyHighlightColor(c));
+  wireCustomColor("fc-color", "fc-palette", c => {
+    restoreRangeOrEnd();
+    document.execCommand("styleWithCSS", false, true);
+    document.execCommand("foreColor", false, c);
+    document.execCommand("styleWithCSS", false, false);
+    afterEdit();
   });
 
   // 글꼴 셀렉트 — 열기 전에 선택 영역을 기억했다가 적용 직전에 복원

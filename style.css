@@ -224,6 +224,27 @@ body {
   font-size: 9px;
   color: var(--muted);
 }
+/* 직접 고르기 — 컬러 휠 */
+.hl-custom {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  background: conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  cursor: pointer;
+  position: relative;
+  display: inline-block;
+}
+.hl-custom:hover { border-color: var(--muted); }
+.hl-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+}
 .tb-sep {
   width: 1px;
   height: 14px;
