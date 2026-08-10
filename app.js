@@ -55,6 +55,7 @@ function cleanNode(parent) {
       const cls = child.classList;
       const isTbox = isBlock && cls.contains("tbox");
       const isTboxBody = isBlock && cls.contains("tbox-body");
+      const isPgbr = isBlock && cls.contains("pgbr");
       const isHandle = isSpan && (cls.contains("tbox-handle") || cls.contains("tbox-x"));
       const handleCls = isHandle ? (cls.contains("tbox-handle") ? "tbox-handle" : "tbox-x") : "";
       const bg = isSpan ? child.style.backgroundColor : "";
@@ -79,6 +80,9 @@ function cleanNode(parent) {
         if (/^\d+(\.\d+)?(px|%)$/.test(w)) child.style.width = w;
       } else if (isTboxBody) {
         child.className = "tbox-body";
+      } else if (isPgbr) {
+        child.className = "pgbr";
+        child.setAttribute("contenteditable", "false");
       } else if (isHandle) {
         child.className = handleCls;
         child.setAttribute("contenteditable", "false");
@@ -295,6 +299,15 @@ function insertTextBox() {
   sel.removeAllRanges();
   sel.addRange(r);
   body().focus();
+  afterEdit();
+}
+
+// ——— 페이지 나누기 ———
+
+function insertPageBreak() {
+  body().focus();
+  document.execCommand("insertHTML", false,
+    '<div class="pgbr" contenteditable="false"></div><div><br></div>');
   afterEdit();
 }
 
@@ -695,8 +708,9 @@ function main() {
     if (e.key === "Enter") { e.preventDefault(); sizeInput.blur(); }
   });
 
-  // 텍스트 상자
+  // 텍스트 상자 · 페이지 나누기
   $("tbox-btn").onclick = insertTextBox;
+  $("pgbr-btn").onclick = insertPageBreak;
   body().addEventListener("pointerdown", startBoxDrag);
   body().addEventListener("click", e => {
     const x = e.target.closest(".tbox-x");
@@ -755,11 +769,15 @@ function main() {
     resetEditor();
   };
 
-  // ⌘S / Ctrl+S — 워드 프로세서답게
+  // ⌘S 저장 · ⌘⏎ 페이지 나누기 — 워드 프로세서답게
   window.addEventListener("keydown", e => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       savePiece();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      insertPageBreak();
     }
   });
 
