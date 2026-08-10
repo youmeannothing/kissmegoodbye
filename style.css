@@ -407,11 +407,12 @@ body {
   letter-spacing: .22em;
   color: var(--muted);
 }
-.pv-note {
-  font-weight: 400;
-  letter-spacing: 0;
-  font-size: 9px;
-  color: var(--ghost);
+.pv-mode { letter-spacing: 0; }
+.pv-nav {
+  margin-top: 0;
+  padding: 8px;
+  border-top: 1px solid var(--line);
+  background: #fafbfb;
 }
 
 .pv-page { padding: 26px 28px; }

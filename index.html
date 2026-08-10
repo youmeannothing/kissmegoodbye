@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&family=Noto+Serif+KR:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/css/batang.css">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -105,8 +105,17 @@
       </div>
 
       <aside class="paper preview-pane" aria-label="미리보기">
-        <div class="pv-bar">미리보기<span class="pv-note">저장하면 이렇게 보입니다</span></div>
+        <div class="pv-bar">미리보기
+          <span class="v-mode pv-mode">
+            <button type="button" id="pv-scroll">이어서</button><button type="button" id="pv-flip">넘겨서</button>
+          </span>
+        </div>
         <div id="p-body" class="pv-page v-body"></div>
+        <div class="v-pagenav pv-nav" id="pv-pagenav" hidden>
+          <button type="button" id="pv-prev" aria-label="이전 페이지">◀</button>
+          <span id="pv-ind"></span>
+          <button type="button" id="pv-next" aria-label="다음 페이지">▶</button>
+        </div>
       </aside>
       </div>
     </div>
@@ -148,6 +157,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

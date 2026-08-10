@@ -394,9 +394,26 @@ function restoreDraft() {
 
 // ——— 실시간 미리보기 ———
 
+let pvPageIdx = 0;
+
 function renderPreviewPane() {
   const pb = $("p-body");
-  pb.innerHTML = isDocEmpty() ? "" : sanitizeHtml(body().innerHTML);
+  const empty = isDocEmpty();
+  const html = empty ? "" : sanitizeHtml(body().innerHTML);
+  const pages = empty ? [""] : splitPages(html);
+  const nav = $("pv-pagenav");
+  const flip = !!nav && viewMode === "flip" && !empty;
+  if (pvPageIdx > pages.length - 1) pvPageIdx = pages.length - 1;
+  if (pvPageIdx < 0) pvPageIdx = 0;
+  pb.innerHTML = flip ? pages[pvPageIdx] : html;
+  if (nav) nav.hidden = !flip;
+  if (flip) {
+    $("pv-ind").textContent = `${pvPageIdx + 1} / ${pages.length}`;
+    $("pv-prev").disabled = pvPageIdx === 0;
+    $("pv-next").disabled = pvPageIdx === pages.length - 1;
+  }
+  $("pv-scroll")?.classList.toggle("on", viewMode !== "flip");
+  $("pv-flip")?.classList.toggle("on", viewMode === "flip");
   fitBoxHeight(pb);
 }
 
@@ -872,6 +889,19 @@ function main() {
       if (e.key === "ArrowLeft") { e.preventDefault(); $("pg-prev").onclick(); }
       if (e.key === "ArrowRight") { e.preventDefault(); $("pg-next").onclick(); }
     });
+  }
+
+  // 미리보기 — 이어서 / 넘겨서
+  if ($("pv-scroll")) {
+    const setMode = m => {
+      viewMode = m;
+      localStorage.setItem("kmg_viewmode", m);
+      renderPreviewPane();
+    };
+    $("pv-scroll").onclick = () => setMode("scroll");
+    $("pv-flip").onclick = () => setMode("flip");
+    $("pv-prev").onclick = () => { pvPageIdx--; renderPreviewPane(); };
+    $("pv-next").onclick = () => { pvPageIdx++; renderPreviewPane(); };
   }
 
   $("export-btn").onclick = exportAll;
