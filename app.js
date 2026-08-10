@@ -237,20 +237,44 @@ function applyForeColor(color) {
   afterEdit();
 }
 
-// 자유 px 크기 — fontSize 7을 찍은 뒤 그 자리를 원하는 px로 치환하는 표준 트릭
-function applyFontSizePx(px) {
-  restoreRangeOrEnd();
-  document.execCommand("styleWithCSS", false, true);
-  document.execCommand("fontSize", false, "7");
-  document.execCommand("styleWithCSS", false, false);
-  body().querySelectorAll("span, font").forEach(el => {
-    if (el.style.fontSize === "xxx-large") el.style.fontSize = px + "px";
-    if (el.tagName === "FONT" && el.getAttribute("size") === "7") {
-      el.removeAttribute("size");
-      el.style.fontSize = px + "px";
-    }
+// ——— 선택 부분 스타일러 (글자 크기·자간 입력칸용) ———
+// 포커스·선택을 절대 건드리지 않는다: 입력칸에 숫자를 치는 동안
+// 포커스가 문서로 튀면 이후 키 입력이 본문을 지워버리기 때문.
+// 선택은 selectionchange로 추적해 두고, 적용은 그 범위를 span으로 직접 감싼다.
+function makeSelectionStyler(styleProp, format) {
+  let range = null;   // 마지막으로 추적한 본문 선택
+  let session = null; // 이번 조정에서 만든 span — 연속 조정 시 이 span만 갱신
+  document.addEventListener("selectionchange", () => {
+    const sel = document.getSelection();
+    if (!sel.rangeCount || !body().contains(sel.anchorNode)) return;
+    // 포커스가 에디터 밖(입력칸 등)일 때 일어나는 선택 붕괴는 무시 — 마지막 선택 유지
+    const ae = document.activeElement;
+    if (sel.isCollapsed && ae !== body() && !body().contains(ae)) return;
+    const inSession = !sel.isCollapsed && session && session.isConnected &&
+      session.contains(sel.anchorNode) && session.contains(sel.focusNode);
+    if (inSession) { range = null; return; } // 같은 부분 재선택 — 세션 유지(span 중첩 방지)
+    session = null;
+    range = sel.isCollapsed ? null : sel.getRangeAt(0).cloneRange();
   });
-  afterEdit();
+  return {
+    apply(v) {
+      if (session && session.isConnected) {
+        session.style[styleProp] = format(v);
+      } else if (range) {
+        const span = document.createElement("span");
+        span.style[styleProp] = format(v);
+        const r = range.cloneRange();
+        try { r.surroundContents(span); }
+        catch { span.appendChild(r.extractContents()); r.insertNode(span); }
+        range = null;
+        session = span;
+      } else {
+        return false; // 적용할 선택이 없다
+      }
+      afterEdit();
+      return true;
+    },
+  };
 }
 
 // ——— 문서 설정 (종이 폭 · 줄간 · 자간) ———
@@ -830,14 +854,19 @@ function main() {
     afterEdit();
   };
 
-  // 글자 크기 — 원하는 px를 직접 입력
+  // 글자 크기 — 원하는 px를 직접 입력, 추적해 둔 선택 부분에만 적용
   const sizeInput = $("size-input");
-  sizeInput.addEventListener("mousedown", rememberRange);
-  sizeInput.addEventListener("focus", () => { if (!savedRange) rememberRange(); });
+  const sizeStyler = makeSelectionStyler("fontSize", v => v + "px");
+  const applySize = () => {
+    const raw = parseFloat(sizeInput.value);
+    if (isNaN(raw)) return; // 입력 중간 상태는 무시
+    sizeStyler.apply(Math.min(200, Math.max(6, raw)));
+  };
+  sizeInput.addEventListener("input", applySize);
   sizeInput.onchange = () => {
-    const px = Math.min(200, Math.max(6, parseFloat(sizeInput.value) || 11.5));
-    sizeInput.value = px;
-    applyFontSizePx(px);
+    const raw = parseFloat(sizeInput.value);
+    if (isNaN(raw)) return;
+    sizeInput.value = Math.min(200, Math.max(6, raw));
   };
   sizeInput.addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); sizeInput.blur(); }
@@ -895,49 +924,14 @@ function main() {
   lhInput.onchange = () => {
     if (isNaN(parseFloat(lhInput.value))) lhInput.value = docStyle.lh;
   };
-  // 자간 — 드래그로 선택해 둔 부분이 있으면 그 부분에만, 없으면 문서 전체에
-  // 선택 부분은 적용 후에도 계속 선택 상태로 남아 스피너로 연속 조정할 수 있다
+  // 자간 — 추적해 둔 선택 부분에만, 선택이 없으면 문서 전체에
   const lsInput = $("ls-input");
-  let lsRange = null;   // 새로 잡은 선택 영역
-  let lsSession = null; // 이번 조정에서 만든 span — 연속 조정 시 이 span만 갱신
-  // 선택이 바뀔 때마다 추적해 둔다 — 입력칸에 포커스가 가면서 선택이 걷혀도
-  // 본문 밖에서 일어난 변화는 무시하므로 마지막 본문 선택이 살아 있다
-  const trackLs = () => {
-    const sel = document.getSelection();
-    if (!sel.rangeCount || !body().contains(sel.anchorNode)) return;
-    // 포커스가 에디터 밖(입력칸 등)에 있을 때 일어나는 선택 붕괴는 무시 — 마지막 선택 유지
-    const ae = document.activeElement;
-    if (sel.isCollapsed && ae !== body() && !body().contains(ae)) return;
-    const inSession = !sel.isCollapsed && lsSession && lsSession.isConnected &&
-      lsSession.contains(sel.anchorNode) && lsSession.contains(sel.focusNode);
-    if (inSession) { lsRange = null; return; } // 같은 부분 재선택 — 세션 유지(span 중첩 방지)
-    lsSession = null;
-    lsRange = sel.isCollapsed ? null : sel.getRangeAt(0).cloneRange();
-  };
-  document.addEventListener("selectionchange", trackLs);
+  const lsStyler = makeSelectionStyler("letterSpacing", v => v + "em");
   const applyLs = () => {
     const raw = parseFloat(lsInput.value);
     if (isNaN(raw)) return; // 입력 중간 상태는 무시
     const v = Math.min(1, Math.max(-0.5, raw));
-    if (lsRange) {
-      const span = document.createElement("span");
-      span.style.letterSpacing = v + "em";
-      const range = lsRange.cloneRange();
-      try { range.surroundContents(span); }
-      catch { span.appendChild(range.extractContents()); range.insertNode(span); }
-      lsRange = null;
-      lsSession = span;
-      // 적용한 부분을 계속 선택 상태로 보여준다
-      const sel = document.getSelection();
-      const r = document.createRange();
-      r.selectNodeContents(span);
-      sel.removeAllRanges();
-      sel.addRange(r);
-      afterEdit();
-    } else if (lsSession && lsSession.isConnected) {
-      lsSession.style.letterSpacing = v + "em";
-      afterEdit();
-    } else {
+    if (!lsStyler.apply(v)) {
       docStyle.ls = String(v);
       applyDocStyle();
       saveDraft();
