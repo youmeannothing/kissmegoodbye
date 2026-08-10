@@ -183,9 +183,25 @@ function restoreDraft() {
   $("draft-note").hidden = false;
 }
 
+// ——— 실시간 미리보기 ———
+
+function renderPreviewPane() {
+  const title = $("f-title").value.trim();
+  const source = $("f-source").value.trim();
+  const t = $("p-title");
+  t.textContent = title || "무제";
+  t.classList.toggle("ph", !title);
+  $("p-meta").textContent =
+    (source ? `〔${source}〕 · ` : "") + fmtStamp.format(new Date());
+  $("p-body").innerHTML = isDocEmpty()
+    ? '<span class="ph">본문이 아직 비어 있습니다.</span>'
+    : sanitizeHtml(body().innerHTML);
+}
+
 function afterEdit() {
   updateCharCount();
   refreshToolbarState();
+  renderPreviewPane();
   saveDraft();
 }
 
@@ -199,6 +215,7 @@ function resetEditor() {
   localStorage.removeItem(DRAFT_KEY);
   $("draft-note").hidden = true;
   updateCharCount();
+  renderPreviewPane();
   $("editor-heading").textContent = "새 조각";
   $("save-btn").textContent = "저장";
 }
@@ -235,6 +252,7 @@ function beginEdit(p) {
   $("f-source").value = p.source || "";
   body().innerHTML = sanitizeHtml(p.html);
   updateCharCount();
+  renderPreviewPane();
   document.querySelector(".paper").scrollIntoView({ behavior: "smooth", block: "center" });
   body().focus();
 }
@@ -394,6 +412,7 @@ function main() {
   renderList();
   restoreDraft();
   updateCharCount();
+  renderPreviewPane();
 
   // 툴바 — mousedown을 막아 본문 선택이 풀리지 않게 한다
   const toolbar = $("toolbar");
@@ -415,8 +434,8 @@ function main() {
     document.execCommand("insertText", false, text);
   });
   body().addEventListener("input", afterEdit);
-  $("f-title").addEventListener("input", saveDraft);
-  $("f-source").addEventListener("input", saveDraft);
+  $("f-title").addEventListener("input", () => { renderPreviewPane(); saveDraft(); });
+  $("f-source").addEventListener("input", () => { renderPreviewPane(); saveDraft(); });
 
   // 파일 삽입
   $("file-btn").addEventListener("mousedown", rememberRange);

@@ -20,6 +20,7 @@
     <div class="grp">
       <div class="gh"><span id="editor-heading">새 조각</span><span class="gh-note" id="draft-note" hidden>임시 저장됨</span></div>
 
+      <div class="workspace">
       <div class="paper">
         <div class="doc-toolbar" id="toolbar">
           <button type="button" data-cmd="undo" title="되돌리기">
@@ -53,6 +54,16 @@
           <button type="button" class="btn" id="clear-btn">새로 쓰기</button>
           <span class="status-hint">⌘S 로도 저장됩니다</span>
         </div>
+      </div>
+
+      <aside class="paper preview-pane" aria-label="미리보기">
+        <div class="pv-bar">미리보기<span class="pv-note">저장하면 이렇게 보입니다</span></div>
+        <div class="pv-page">
+          <div id="p-title" class="pv-title ph">무제</div>
+          <div id="p-meta" class="pv-meta"></div>
+          <div id="p-body" class="v-body"></div>
+        </div>
+      </aside>
       </div>
     </div>
 

@@ -87,7 +87,62 @@ body {
 
 /* ——— 워드 프로세서 ——— */
 
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: start;
+}
+/* 넓은 화면에서는 문서와 미리보기가 나란히 */
+@media (min-width: 880px) {
+  .sheet { max-width: 950px; }
+  .workspace { grid-template-columns: 1fr 1fr; }
+  .preview-pane { position: sticky; top: 24px; }
+  .piece-list { display: grid; grid-template-columns: 1fr 1fr; }
+}
+
 .paper { border: 1px solid var(--line); }
+
+/* ——— 미리보기 창 ——— */
+
+.pv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfb;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  color: var(--muted);
+}
+.pv-note {
+  font-weight: 400;
+  letter-spacing: 0;
+  font-size: 9px;
+  color: var(--ghost);
+}
+
+.pv-page { padding: 22px 24px 24px; }
+
+.pv-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.pv-title.ph { color: var(--ghost); }
+
+.pv-meta {
+  font-size: 9.5px;
+  color: var(--faint);
+  margin-top: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
 
 /* 툴바 — 문서 프레임 상단 */
 .doc-toolbar {
