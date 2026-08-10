@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&family=Noto+Serif+KR:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/css/batang.css">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -91,7 +91,7 @@
           <span class="tb-sep" aria-hidden="true"></span>
           <label class="tb-num"><span>종이</span><input type="number" id="width-input" min="200" max="3000" step="10" placeholder="자동" title="종이 폭 (px) — 비우면 자동"></label>
           <label class="tb-num"><span>줄간</span><input type="number" id="lh-input" min="0.5" max="5" step="0.05" value="1.85" title="줄 간격 (배수)"></label>
-          <label class="tb-num"><span>자간</span><input type="number" id="ls-input" min="-0.5" max="1" step="0.01" value="0" title="자간 (em)"></label>
+          <label class="tb-num"><span>자간</span><input type="number" id="ls-input" min="-0.5" max="1" step="0.01" value="0" title="자간 (em) — 드래그로 선택한 부분이 있으면 그 부분에만"></label>
           <span class="tb-count"><b id="char-count">0</b>자</span>
         </div>
 
@@ -130,9 +130,17 @@
   <dialog id="view-dialog" class="view-dialog">
     <div class="v-head">
       <div id="v-meta" class="v-meta"></div>
+      <span class="v-mode" id="v-mode" hidden>
+        <button type="button" id="vm-scroll">이어서</button><button type="button" id="vm-flip">넘겨서</button>
+      </span>
       <button type="button" id="v-close" class="v-close" aria-label="닫기">✕</button>
     </div>
     <div id="v-body" class="v-body"></div>
+    <div class="v-pagenav" id="v-pagenav" hidden>
+      <button type="button" id="pg-prev" aria-label="이전 페이지">◀</button>
+      <span id="pg-ind"></span>
+      <button type="button" id="pg-next" aria-label="다음 페이지">▶</button>
+    </div>
     <div class="v-actions">
       <button type="button" id="v-edit" class="btn">수정</button>
       <button type="button" id="v-download" class="btn">.txt 내려받기</button>
@@ -140,6 +148,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

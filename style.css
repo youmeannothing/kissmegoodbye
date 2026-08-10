@@ -502,6 +502,55 @@ body {
   color: var(--faint);
 }
 
+/* 보기 방식 토글 (이어서 / 넘겨서) */
+.v-mode {
+  display: inline-flex;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.v-mode button {
+  font-family: var(--sans);
+  font-size: 9px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.v-mode button + button { border-left: none; }
+.v-mode button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* 페이지 넘기기 내비게이션 */
+.v-pagenav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.v-pagenav button {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--body);
+  font-size: 9px;
+  width: 26px;
+  height: 22px;
+  cursor: pointer;
+}
+.v-pagenav button:hover:not(:disabled) { border-color: var(--muted); }
+.v-pagenav button:disabled { color: var(--ghost); cursor: default; }
+.v-pagenav span {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
 .v-close {
   background: none;
   border: none;

@@ -62,6 +62,7 @@ function cleanNode(parent) {
       const ff = isSpan ? child.style.fontFamily : "";
       const fsz = isSpan ? child.style.fontSize : "";
       const color = isSpan ? child.style.color : "";
+      const lsp = isSpan ? child.style.letterSpacing : "";
       const align = isBlock
         ? (child.style.textAlign || child.getAttribute("align") || "") : "";
       const left = isTbox ? child.style.left : "";
@@ -72,6 +73,7 @@ function cleanNode(parent) {
       if (ff) child.style.fontFamily = ff;
       if (/^\d+(\.\d+)?px$/.test(fsz)) child.style.fontSize = fsz;
       if (/^(#[0-9a-f]{3,8}|rgba?\([\d.,\s]+\))$/i.test(color)) child.style.color = color;
+      if (/^-?\d+(\.\d+)?(em|px)$/.test(lsp)) child.style.letterSpacing = lsp;
       if (/^(left|center|right|justify)$/.test(align)) child.style.textAlign = align;
       if (isTbox) {
         child.className = "tbox";
@@ -499,11 +501,53 @@ function renderList() {
   });
 }
 
+// 페이지 나눔(.pgbr) 기준으로 문서를 장별 html 배열로 쪼갠다
+function splitPages(html) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  const pages = [document.createElement("div")];
+  [...tmp.childNodes].forEach(n => {
+    if (n.nodeType === Node.ELEMENT_NODE && n.classList.contains("pgbr")) {
+      pages.push(document.createElement("div"));
+      return;
+    }
+    pages[pages.length - 1].appendChild(n);
+    // 나눔이 블록 안에 중첩된 경우 그 블록 뒤에서 장을 끊는다
+    if (n.nodeType === Node.ELEMENT_NODE && n.querySelector?.(".pgbr")) {
+      pages.push(document.createElement("div"));
+    }
+  });
+  const nonEmpty = pages.filter(p => p.textContent.trim() || p.querySelector("img"));
+  return (nonEmpty.length ? nonEmpty : [pages[0]]).map(p => p.innerHTML);
+}
+
+// 보기 방식: scroll(이어서) | flip(넘겨서) — 선택을 기억한다
+let viewMode = localStorage.getItem("kmg_viewmode") || "scroll";
+let viewPages = [];
+let viewPageIdx = 0;
+
+function renderViewBody() {
+  const vb = $("v-body");
+  const flip = viewMode === "flip" && viewPages.length > 1;
+  vb.innerHTML = flip ? viewPages[viewPageIdx] : viewPages.join('<div class="pgbr"></div>');
+  $("v-pagenav").hidden = !flip;
+  if (flip) {
+    $("pg-ind").textContent = `${viewPageIdx + 1} / ${viewPages.length}`;
+    $("pg-prev").disabled = viewPageIdx === 0;
+    $("pg-next").disabled = viewPageIdx === viewPages.length - 1;
+  }
+  $("vm-scroll").classList.toggle("on", viewMode !== "flip");
+  $("vm-flip").classList.toggle("on", viewMode === "flip");
+  fitBoxHeight(vb);
+}
+
 function viewPiece(p) {
   const dlg = $("view-dialog");
   $("v-meta").textContent = metaText(p);
   const vb = $("v-body");
-  vb.innerHTML = sanitizeHtml(p.html);
+  viewPages = splitPages(sanitizeHtml(p.html));
+  viewPageIdx = 0;
+  $("v-mode").hidden = viewPages.length < 2;
   vb.style.lineHeight = p.lh || "1.85";
   vb.style.letterSpacing = (p.ls || "0") + "em";
   dlg.style.width = p.width
@@ -518,7 +562,7 @@ function viewPiece(p) {
     renderList();
   };
   dlg.showModal();
-  fitBoxHeight(vb); // 다이얼로그가 열린 뒤에야 높이를 잴 수 있다
+  renderViewBody(); // 다이얼로그가 열린 뒤에야 상자 높이를 잴 수 있다
 }
 
 // ——— 파일로 저장 ———
@@ -732,13 +776,34 @@ function main() {
     applyDocStyle();
     saveDraft();
   };
-  $("ls-input").onchange = e => {
+  // 자간 — 드래그로 선택해 둔 부분이 있으면 그 부분에만, 없으면 문서 전체에
+  const lsInput = $("ls-input");
+  let lsRange = null;
+  const captureLsRange = () => {
+    const sel = document.getSelection();
+    lsRange = (sel.rangeCount && !sel.isCollapsed && body().contains(sel.anchorNode))
+      ? sel.getRangeAt(0).cloneRange() : null;
+  };
+  lsInput.addEventListener("mousedown", captureLsRange);
+  lsInput.addEventListener("focus", () => { if (!lsRange) captureLsRange(); });
+  lsInput.onchange = e => {
     const raw = parseFloat(e.target.value);
     const v = Math.min(1, Math.max(-0.5, isNaN(raw) ? 0 : raw));
-    docStyle.ls = String(v);
     e.target.value = v;
-    applyDocStyle();
-    saveDraft();
+    if (lsRange) {
+      const span = document.createElement("span");
+      span.style.letterSpacing = v + "em";
+      const range = lsRange.cloneRange();
+      try { range.surroundContents(span); }
+      catch { span.appendChild(range.extractContents()); range.insertNode(span); }
+      lsRange = null;
+      e.target.value = docStyle.ls; // 입력칸은 문서 기본값 표시로 복귀
+      afterEdit();
+    } else {
+      docStyle.ls = String(v);
+      applyDocStyle();
+      saveDraft();
+    }
   };
 
   document.addEventListener("selectionchange", refreshToolbarState);
@@ -782,6 +847,27 @@ function main() {
   });
 
   $("v-close").onclick = () => $("view-dialog").close();
+
+  // 상세보기 — 이어서 / 넘겨서
+  $("vm-scroll").onclick = () => {
+    viewMode = "scroll";
+    localStorage.setItem("kmg_viewmode", viewMode);
+    renderViewBody();
+  };
+  $("vm-flip").onclick = () => {
+    viewMode = "flip";
+    localStorage.setItem("kmg_viewmode", viewMode);
+    renderViewBody();
+  };
+  $("pg-prev").onclick = () => { if (viewPageIdx > 0) { viewPageIdx--; renderViewBody(); } };
+  $("pg-next").onclick = () => {
+    if (viewPageIdx < viewPages.length - 1) { viewPageIdx++; renderViewBody(); }
+  };
+  $("view-dialog").addEventListener("keydown", e => {
+    if (viewMode !== "flip" || viewPages.length < 2) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); $("pg-prev").onclick(); }
+    if (e.key === "ArrowRight") { e.preventDefault(); $("pg-next").onclick(); }
+  });
 
   $("export-btn").onclick = exportAll;
   $("import-btn").onclick = () => $("f-import").click();
