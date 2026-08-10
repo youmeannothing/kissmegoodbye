@@ -39,23 +39,50 @@ function cleanNode(parent) {
       if (!src.startsWith("data:image/")) { child.remove(); return; }
       [...child.attributes].forEach(a => { if (a.name !== "src") child.removeAttribute(a.name); });
     } else if (tag === "FONT") {
-      // 글꼴·크기 지정 (execCommand fontName/fontSize 산출물)
+      // 글꼴·크기·색 지정 (execCommand 산출물)
       const face = child.getAttribute("face") || "";
       const size = child.getAttribute("size") || "";
+      const color = child.getAttribute("color") || child.style.color || "";
+      const fsz = child.style.fontSize || "";
       [...child.attributes].forEach(a => child.removeAttribute(a.name));
       if (face) child.setAttribute("face", face);
       if (/^[1-7]$/.test(size)) child.setAttribute("size", size);
+      if (/^(#[0-9a-f]{3,8}|rgba?\([\d.,\s]+\))$/i.test(color)) child.style.color = color;
+      if (/^\d+(\.\d+)?px$/.test(fsz)) child.style.fontSize = fsz;
     } else if (ALLOWED_TAGS.has(tag)) {
-      const bg = tag === "SPAN" ? child.style.backgroundColor : "";
-      const ff = tag === "SPAN" ? child.style.fontFamily : "";
-      const fsz = tag === "SPAN" ? child.style.fontSize : "";
-      const align = (tag === "DIV" || tag === "P")
+      const isSpan = tag === "SPAN";
+      const isBlock = tag === "DIV" || tag === "P";
+      const cls = child.classList;
+      const isTbox = isBlock && cls.contains("tbox");
+      const isTboxBody = isBlock && cls.contains("tbox-body");
+      const isHandle = isSpan && (cls.contains("tbox-handle") || cls.contains("tbox-x"));
+      const handleCls = isHandle ? (cls.contains("tbox-handle") ? "tbox-handle" : "tbox-x") : "";
+      const bg = isSpan ? child.style.backgroundColor : "";
+      const ff = isSpan ? child.style.fontFamily : "";
+      const fsz = isSpan ? child.style.fontSize : "";
+      const color = isSpan ? child.style.color : "";
+      const align = isBlock
         ? (child.style.textAlign || child.getAttribute("align") || "") : "";
+      const left = isTbox ? child.style.left : "";
+      const top = isTbox ? child.style.top : "";
+      const w = isTbox ? child.style.width : "";
       [...child.attributes].forEach(a => child.removeAttribute(a.name));
       if (bg && bg !== "transparent") child.style.backgroundColor = bg;
       if (ff) child.style.fontFamily = ff;
       if (/^\d+(\.\d+)?px$/.test(fsz)) child.style.fontSize = fsz;
+      if (/^(#[0-9a-f]{3,8}|rgba?\([\d.,\s]+\))$/i.test(color)) child.style.color = color;
       if (/^(left|center|right|justify)$/.test(align)) child.style.textAlign = align;
+      if (isTbox) {
+        child.className = "tbox";
+        if (/^-?\d+(\.\d+)?px$/.test(left)) child.style.left = left;
+        if (/^-?\d+(\.\d+)?px$/.test(top)) child.style.top = top;
+        if (/^\d+(\.\d+)?(px|%)$/.test(w)) child.style.width = w;
+      } else if (isTboxBody) {
+        child.className = "tbox-body";
+      } else if (isHandle) {
+        child.className = handleCls;
+        child.setAttribute("contenteditable", "false");
+      }
     } else {
       while (child.firstChild) parent.insertBefore(child.firstChild, child);
       child.remove();
@@ -76,6 +103,7 @@ function htmlToText(html) {
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<(div|p)(\s[^>]*)?>/gi, "\n")
     .replace(/<\/(div|p)>/gi, "\n");
+  div.querySelectorAll(".tbox-handle, .tbox-x").forEach(el => el.remove());
   return div.textContent.replace(/\n{3,}/g, "\n\n").trim();
 }
 
@@ -151,12 +179,18 @@ let editingId = null;
 
 // ——— 편집기 ———
 
+function docText() {
+  const clone = body().cloneNode(true);
+  clone.querySelectorAll(".tbox-handle, .tbox-x").forEach(el => el.remove());
+  return clone.innerText;
+}
+
 function isDocEmpty() {
-  return !body().innerText.trim() && !body().querySelector("img");
+  return !docText().trim() && !body().querySelector("img");
 }
 
 function updateCharCount() {
-  $("char-count").textContent = body().innerText.replace(/\n$/, "").length;
+  $("char-count").textContent = docText().replace(/\n+/g, "").length;
 }
 
 function exec(cmd, value = null) {
@@ -185,6 +219,108 @@ function applyHighlight(color) {
   afterEdit();
 }
 
+function applyForeColor(color) {
+  body().focus();
+  document.execCommand("styleWithCSS", false, true);
+  document.execCommand("foreColor", false, color);
+  document.execCommand("styleWithCSS", false, false);
+  afterEdit();
+}
+
+// 자유 px 크기 — fontSize 7을 찍은 뒤 그 자리를 원하는 px로 치환하는 표준 트릭
+function applyFontSizePx(px) {
+  restoreRangeOrEnd();
+  document.execCommand("styleWithCSS", false, true);
+  document.execCommand("fontSize", false, "7");
+  document.execCommand("styleWithCSS", false, false);
+  body().querySelectorAll("span, font").forEach(el => {
+    if (el.style.fontSize === "xxx-large") el.style.fontSize = px + "px";
+    if (el.tagName === "FONT" && el.getAttribute("size") === "7") {
+      el.removeAttribute("size");
+      el.style.fontSize = px + "px";
+    }
+  });
+  afterEdit();
+}
+
+// ——— 문서 설정 (종이 폭 · 줄간 · 자간) ———
+
+const docStyle = { width: 0, lh: "1.85", ls: "0" };
+
+function applyDocStyle() {
+  const ws = document.querySelector(".workspace");
+  const wide = docStyle.width >= 620;
+  ws.classList.toggle("w-wide", wide);
+  document.querySelectorAll(".workspace .paper").forEach(p => {
+    p.style.width = docStyle.width ? docStyle.width + "px" : "";
+  });
+  [body(), $("p-body")].forEach(el => {
+    el.style.lineHeight = docStyle.lh;
+    el.style.letterSpacing = docStyle.ls + "em";
+  });
+}
+
+function syncDocInputs() {
+  $("width-input").value = docStyle.width || "";
+  $("lh-input").value = docStyle.lh;
+  $("ls-input").value = docStyle.ls;
+}
+
+// 절대 위치 텍스트 상자가 컨테이너 높이 밖으로 나가지 않게 늘려준다
+function fitBoxHeight(container, base = 0) {
+  let max = 0;
+  container.querySelectorAll(".tbox").forEach(b => {
+    max = Math.max(max, b.offsetTop + b.offsetHeight);
+  });
+  container.style.minHeight = max ? Math.max(base, max + 20) + "px" : (base ? base + "px" : "");
+}
+
+// ——— 텍스트 상자 — 드래그로 자유 배치 ———
+
+function insertTextBox() {
+  const n = body().querySelectorAll(".tbox").length;
+  const box = document.createElement("div");
+  box.className = "tbox";
+  box.style.left = (24 + n * 18) + "px";
+  box.style.top = (24 + n * 18) + "px";
+  box.style.width = "180px";
+  box.innerHTML =
+    '<span class="tbox-handle" contenteditable="false" title="드래그해서 옮기기">⠿</span>' +
+    '<span class="tbox-x" contenteditable="false" title="상자 삭제">✕</span>' +
+    '<div class="tbox-body">텍스트 상자</div>';
+  body().appendChild(box);
+  const r = document.createRange();
+  r.selectNodeContents(box.querySelector(".tbox-body"));
+  const sel = document.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+  body().focus();
+  afterEdit();
+}
+
+function startBoxDrag(e) {
+  const handle = e.target.closest(".tbox-handle");
+  if (!handle) return false;
+  const box = handle.closest(".tbox");
+  e.preventDefault();
+  const pageRect = body().getBoundingClientRect();
+  const boxRect = box.getBoundingClientRect();
+  const ox = e.clientX - boxRect.left;
+  const oy = e.clientY - boxRect.top;
+  const move = ev => {
+    box.style.left = Math.max(0, ev.clientX - pageRect.left - ox) + "px";
+    box.style.top = Math.max(0, ev.clientY - pageRect.top - oy) + "px";
+  };
+  const up = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    afterEdit();
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+  return true;
+}
+
 // 선택 영역의 꾸밈 상태를 툴바에 반영
 function refreshToolbarState() {
   const sel = document.getSelection();
@@ -204,14 +340,13 @@ function refreshToolbarState() {
       .replace(/['"]/g, "").split(",")[0].trim().toLowerCase();
     const match = [...fontSel.options].find(o => o.value.toLowerCase() === fn);
     fontSel.value = match ? match.value : "Pretendard Variable";
-    // 크롬의 legacy 크기표 대신 실제 px를 읽어 가장 가까운 단계로 표시
+    // 커서 위치의 실제 px를 크기 입력칸에 표시 (입력 중일 때는 건드리지 않는다)
+    const sizeInput = $("size-input");
     let el = sel.anchorNode;
     if (el && el.nodeType === Node.TEXT_NODE) el = el.parentElement;
-    if (el && body().contains(el)) {
+    if (el && body().contains(el) && document.activeElement !== sizeInput) {
       const px = parseFloat(getComputedStyle(el).fontSize);
-      const steps = [[1, 9], [2, 10.5], [3, 11.5], [4, 13], [5, 15], [6, 18], [7, 22]];
-      const [step] = steps.reduce((a, b) => Math.abs(b[1] - px) < Math.abs(a[1] - px) ? b : a);
-      $("size-select").value = String(step);
+      sizeInput.value = Math.round(px * 10) / 10;
     }
   }
 }
@@ -225,7 +360,7 @@ function saveDraft() {
     return;
   }
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ html: body().innerHTML }));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ html: body().innerHTML, ...docStyle }));
     $("draft-note").hidden = false;
   } catch { /* 저장 공간 부족 — 조용히 무시 */ }
 }
@@ -236,19 +371,25 @@ function restoreDraft() {
   catch { return; }
   if (!draft) return;
   body().innerHTML = sanitizeHtml(draft.html || "");
+  docStyle.width = draft.width || 0;
+  docStyle.lh = draft.lh || "1.85";
+  docStyle.ls = draft.ls || "0";
   $("draft-note").hidden = isDocEmpty();
 }
 
 // ——— 실시간 미리보기 ———
 
 function renderPreviewPane() {
-  $("p-body").innerHTML = isDocEmpty() ? "" : sanitizeHtml(body().innerHTML);
+  const pb = $("p-body");
+  pb.innerHTML = isDocEmpty() ? "" : sanitizeHtml(body().innerHTML);
+  fitBoxHeight(pb);
 }
 
 function afterEdit() {
   updateCharCount();
   refreshToolbarState();
   renderPreviewPane();
+  fitBoxHeight(body(), 380);
   saveDraft();
 }
 
@@ -267,13 +408,14 @@ function resetEditor() {
 function savePiece() {
   if (isDocEmpty()) { body().focus(); return; }
   const html = sanitizeHtml(body().innerHTML);
+  const data = { html, ...docStyle };
   try {
     const list = loadPieces();
     if (editingId) {
       savePieces(list.map(p => p.id === editingId
-        ? { ...p, html, editedAt: Date.now() } : p));
+        ? { ...p, ...data, editedAt: Date.now() } : p));
     } else {
-      list.push({ html, id: crypto.randomUUID(), createdAt: Date.now() });
+      list.push({ ...data, id: crypto.randomUUID(), createdAt: Date.now() });
       savePieces(list);
     }
     resetEditor();
@@ -288,8 +430,14 @@ function beginEdit(p) {
   editingId = p.id;
   $("save-btn").textContent = "수정 완료";
   body().innerHTML = sanitizeHtml(p.html);
+  docStyle.width = p.width || 0;
+  docStyle.lh = p.lh || "1.85";
+  docStyle.ls = p.ls || "0";
+  syncDocInputs();
+  applyDocStyle();
   updateCharCount();
   renderPreviewPane();
+  fitBoxHeight(body(), 380);
   document.querySelector(".paper").scrollIntoView({ behavior: "smooth", block: "center" });
   body().focus();
 }
@@ -341,7 +489,12 @@ function renderList() {
 function viewPiece(p) {
   const dlg = $("view-dialog");
   $("v-meta").textContent = metaText(p);
-  $("v-body").innerHTML = sanitizeHtml(p.html);
+  const vb = $("v-body");
+  vb.innerHTML = sanitizeHtml(p.html);
+  vb.style.lineHeight = p.lh || "1.85";
+  vb.style.letterSpacing = (p.ls || "0") + "em";
+  dlg.style.width = p.width
+    ? Math.min(p.width + 54, Math.floor(window.innerWidth * 0.9)) + "px" : "";
 
   $("v-edit").onclick = () => { dlg.close(); beginEdit(p); };
   $("v-download").onclick = () => downloadTxt(p);
@@ -352,6 +505,7 @@ function viewPiece(p) {
     renderList();
   };
   dlg.showModal();
+  fitBoxHeight(vb); // 다이얼로그가 열린 뒤에야 높이를 잴 수 있다
 }
 
 // ——— 파일로 저장 ———
@@ -447,46 +601,101 @@ async function insertFile(file) {
 function main() {
   renderList();
   restoreDraft();
+  syncDocInputs();
+  applyDocStyle();
   updateCharCount();
   renderPreviewPane();
 
-  // 툴바 — mousedown을 막아 본문 선택이 풀리지 않게 한다 (셀렉트는 예외)
+  // 툴바 — mousedown을 막아 본문 선택이 풀리지 않게 한다 (셀렉트·입력칸은 예외)
   const toolbar = $("toolbar");
   toolbar.addEventListener("mousedown", e => {
-    if (!e.target.closest("select")) e.preventDefault();
+    if (!e.target.closest("select, input, label")) e.preventDefault();
   });
   toolbar.addEventListener("click", e => {
     const btn = e.target.closest("button[data-cmd]");
     if (btn) exec(btn.dataset.cmd);
   });
 
-  // 형광펜 팔레트
-  $("hl-btn").onclick = () => { $("hl-palette").hidden = !$("hl-palette").hidden; };
+  // 형광펜·글자색 팔레트
+  $("hl-btn").onclick = () => {
+    $("fc-palette").hidden = true;
+    $("hl-palette").hidden = !$("hl-palette").hidden;
+  };
   $("hl-palette").addEventListener("click", e => {
     const sw = e.target.closest("button[data-hl]");
     if (!sw) return;
     applyHighlight(sw.dataset.hl);
     $("hl-palette").hidden = true;
   });
+  $("fc-btn").onclick = () => {
+    $("hl-palette").hidden = true;
+    $("fc-palette").hidden = !$("fc-palette").hidden;
+  };
+  $("fc-palette").addEventListener("click", e => {
+    const sw = e.target.closest("button[data-fc]");
+    if (!sw) return;
+    applyForeColor(sw.dataset.fc);
+    $("fc-palette").hidden = true;
+  });
   document.addEventListener("click", e => {
-    if (!e.target.closest(".hl-wrap")) $("hl-palette").hidden = true;
+    if (!e.target.closest(".hl-wrap")) {
+      $("hl-palette").hidden = true;
+      $("fc-palette").hidden = true;
+    }
   });
 
-  // 글꼴·크기 셀렉트 — 열기 전에 선택 영역을 기억했다가 적용 직전에 복원
+  // 글꼴 셀렉트 — 열기 전에 선택 영역을 기억했다가 적용 직전에 복원
   const fontSel = $("font-select");
-  const sizeSel = $("size-select");
-  [fontSel, sizeSel].forEach(sel => sel.addEventListener("mousedown", rememberRange));
+  fontSel.addEventListener("mousedown", rememberRange);
   fontSel.onchange = () => {
     restoreRangeOrEnd();
     document.execCommand("styleWithCSS", false, false);
     document.execCommand("fontName", false, fontSel.value);
     afterEdit();
   };
-  sizeSel.onchange = () => {
-    restoreRangeOrEnd();
-    document.execCommand("styleWithCSS", false, false);
-    document.execCommand("fontSize", false, sizeSel.value);
-    afterEdit();
+
+  // 글자 크기 — 원하는 px를 직접 입력
+  const sizeInput = $("size-input");
+  sizeInput.addEventListener("mousedown", rememberRange);
+  sizeInput.addEventListener("focus", () => { if (!savedRange) rememberRange(); });
+  sizeInput.onchange = () => {
+    const px = Math.min(200, Math.max(6, parseFloat(sizeInput.value) || 11.5));
+    sizeInput.value = px;
+    applyFontSizePx(px);
+  };
+  sizeInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); sizeInput.blur(); }
+  });
+
+  // 텍스트 상자
+  $("tbox-btn").onclick = insertTextBox;
+  body().addEventListener("pointerdown", startBoxDrag);
+  body().addEventListener("click", e => {
+    const x = e.target.closest(".tbox-x");
+    if (x) { x.closest(".tbox").remove(); afterEdit(); }
+  });
+
+  // 문서 설정 — 종이 폭 · 줄간 · 자간
+  $("width-input").onchange = e => {
+    const v = parseInt(e.target.value, 10);
+    docStyle.width = v ? Math.min(2000, Math.max(280, v)) : 0;
+    e.target.value = docStyle.width || "";
+    applyDocStyle();
+    saveDraft();
+  };
+  $("lh-input").onchange = e => {
+    const v = Math.min(4, Math.max(1, parseFloat(e.target.value) || 1.85));
+    docStyle.lh = String(v);
+    e.target.value = v;
+    applyDocStyle();
+    saveDraft();
+  };
+  $("ls-input").onchange = e => {
+    const v = Math.min(0.5, Math.max(-0.1, parseFloat(e.target.value) || 0));
+    docStyle.ls = String(v);
+    e.target.value = v;
+    applyDocStyle();
+    saveDraft();
   };
 
   document.addEventListener("selectionchange", refreshToolbarState);

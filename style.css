@@ -101,7 +101,11 @@ body {
   .piece-list { display: grid; grid-template-columns: 1fr 1fr; }
 }
 
-.paper { border: 1px solid var(--line); }
+/* 종이 폭을 넓게 잡으면 미리보기가 아래로 내려가고 문서가 전체 폭을 쓴다 */
+.workspace.w-wide { grid-template-columns: 1fr; }
+.workspace.w-wide .preview-pane { position: static; }
+
+.paper { border: 1px solid var(--line); max-width: 100%; margin: 0 auto; width: 100%; }
 
 /* 툴바 — 문서 프레임 상단 */
 .doc-toolbar {
@@ -152,7 +156,46 @@ body {
 }
 .tb-select:hover { border-color: var(--muted); }
 .tb-select:focus { outline: none; border-color: var(--muted); }
-.tb-select-num { font-family: var(--mono); font-size: 9.5px; }
+
+/* 숫자 입력 (글자 크기·종이 폭·줄간·자간) */
+.tb-num-input {
+  height: 22px;
+  width: 46px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--body);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 2px 0 5px;
+}
+.tb-num-input:hover { border-color: var(--muted); }
+.tb-num-input:focus { outline: none; border-color: var(--muted); }
+.tb-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tb-num span {
+  font-size: 9px;
+  color: var(--faint);
+  letter-spacing: .06em;
+}
+.tb-num input {
+  height: 22px;
+  width: 48px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--body);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 2px 0 5px;
+}
+.tb-num input:hover { border-color: var(--muted); }
+.tb-num input:focus { outline: none; border-color: var(--muted); }
+
+.fc-btn { font-weight: 700; border-bottom: 2px solid var(--accent) !important; }
 
 /* 형광펜 팔레트 */
 .hl-wrap { position: relative; display: inline-flex; }
@@ -200,6 +243,7 @@ body {
 
 /* 종이 — 아무것도 없는 백지 */
 .doc-body {
+  position: relative;
   min-height: 380px;
   padding: 26px 28px;
   font-size: 11.5px;
@@ -209,6 +253,42 @@ body {
   caret-color: var(--accent);
   cursor: text;
 }
+
+/* 텍스트 상자 — 드래그로 자유 배치 */
+.tbox {
+  position: absolute;
+  min-width: 60px;
+  max-width: calc(100% - 20px);
+  padding: 4px 6px;
+  border: 1px dashed transparent;
+}
+.doc-body .tbox:hover, .doc-body .tbox:focus-within {
+  border-color: var(--muted);
+}
+.tbox-handle, .tbox-x {
+  display: none;
+  position: absolute;
+  top: -16px;
+  height: 14px;
+  line-height: 14px;
+  font-size: 9px;
+  background: var(--fill);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 0 4px;
+  user-select: none;
+}
+.tbox-handle { left: -1px; cursor: grab; }
+.tbox-handle:active { cursor: grabbing; }
+.tbox-x { left: 26px; cursor: pointer; }
+.tbox-x:hover { color: var(--accent); border-color: var(--accent); }
+.doc-body .tbox:hover .tbox-handle, .doc-body .tbox:focus-within .tbox-handle,
+.doc-body .tbox:hover .tbox-x, .doc-body .tbox:focus-within .tbox-x {
+  display: block;
+}
+/* 미리보기·상세보기에서는 상자 테두리·핸들 없이 내용만 */
+.v-body { position: relative; }
+.v-body .tbox-handle, .v-body .tbox-x { display: none; }
 .doc-body:focus { outline: none; }
 .doc-body mark, .v-body mark {
   background: var(--accent-fill);
