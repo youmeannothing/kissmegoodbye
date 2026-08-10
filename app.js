@@ -528,16 +528,18 @@ let viewPageIdx = 0;
 
 function renderViewBody() {
   const vb = $("v-body");
-  const flip = viewMode === "flip" && viewPages.length > 1;
+  // 배포 직후 캐시가 어긋나 옛 HTML이 남아 있어도 상세보기 자체는 열리게 방어
+  const nav = $("v-pagenav");
+  const flip = !!nav && viewMode === "flip" && viewPages.length > 1;
   vb.innerHTML = flip ? viewPages[viewPageIdx] : viewPages.join('<div class="pgbr"></div>');
-  $("v-pagenav").hidden = !flip;
+  if (nav) nav.hidden = !flip;
   if (flip) {
     $("pg-ind").textContent = `${viewPageIdx + 1} / ${viewPages.length}`;
     $("pg-prev").disabled = viewPageIdx === 0;
     $("pg-next").disabled = viewPageIdx === viewPages.length - 1;
   }
-  $("vm-scroll").classList.toggle("on", viewMode !== "flip");
-  $("vm-flip").classList.toggle("on", viewMode === "flip");
+  $("vm-scroll")?.classList.toggle("on", viewMode !== "flip");
+  $("vm-flip")?.classList.toggle("on", viewMode === "flip");
   fitBoxHeight(vb);
 }
 
@@ -547,7 +549,8 @@ function viewPiece(p) {
   const vb = $("v-body");
   viewPages = splitPages(sanitizeHtml(p.html));
   viewPageIdx = 0;
-  $("v-mode").hidden = viewPages.length < 2;
+  const vmode = $("v-mode");
+  if (vmode) vmode.hidden = viewPages.length < 2;
   vb.style.lineHeight = p.lh || "1.85";
   vb.style.letterSpacing = (p.ls || "0") + "em";
   dlg.style.width = p.width
@@ -848,26 +851,28 @@ function main() {
 
   $("v-close").onclick = () => $("view-dialog").close();
 
-  // 상세보기 — 이어서 / 넘겨서
-  $("vm-scroll").onclick = () => {
-    viewMode = "scroll";
-    localStorage.setItem("kmg_viewmode", viewMode);
-    renderViewBody();
-  };
-  $("vm-flip").onclick = () => {
-    viewMode = "flip";
-    localStorage.setItem("kmg_viewmode", viewMode);
-    renderViewBody();
-  };
-  $("pg-prev").onclick = () => { if (viewPageIdx > 0) { viewPageIdx--; renderViewBody(); } };
-  $("pg-next").onclick = () => {
-    if (viewPageIdx < viewPages.length - 1) { viewPageIdx++; renderViewBody(); }
-  };
-  $("view-dialog").addEventListener("keydown", e => {
-    if (viewMode !== "flip" || viewPages.length < 2) return;
-    if (e.key === "ArrowLeft") { e.preventDefault(); $("pg-prev").onclick(); }
-    if (e.key === "ArrowRight") { e.preventDefault(); $("pg-next").onclick(); }
-  });
+  // 상세보기 — 이어서 / 넘겨서 (옛 HTML 캐시가 남아 있으면 요소가 없을 수 있다)
+  if ($("vm-scroll")) {
+    $("vm-scroll").onclick = () => {
+      viewMode = "scroll";
+      localStorage.setItem("kmg_viewmode", viewMode);
+      renderViewBody();
+    };
+    $("vm-flip").onclick = () => {
+      viewMode = "flip";
+      localStorage.setItem("kmg_viewmode", viewMode);
+      renderViewBody();
+    };
+    $("pg-prev").onclick = () => { if (viewPageIdx > 0) { viewPageIdx--; renderViewBody(); } };
+    $("pg-next").onclick = () => {
+      if (viewPageIdx < viewPages.length - 1) { viewPageIdx++; renderViewBody(); }
+    };
+    $("view-dialog").addEventListener("keydown", e => {
+      if (viewMode !== "flip" || viewPages.length < 2) return;
+      if (e.key === "ArrowLeft") { e.preventDefault(); $("pg-prev").onclick(); }
+      if (e.key === "ArrowRight") { e.preventDefault(); $("pg-next").onclick(); }
+    });
+  }
 
   $("export-btn").onclick = exportAll;
   $("import-btn").onclick = () => $("f-import").click();
