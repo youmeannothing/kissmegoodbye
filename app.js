@@ -219,15 +219,6 @@ function applyHighlight(color) {
   afterEdit();
 }
 
-// 직접 고른 색은 토글 없이 그대로 칠한다
-function applyHighlightColor(color) {
-  restoreRangeOrEnd();
-  document.execCommand("styleWithCSS", false, true);
-  document.execCommand("hiliteColor", false, color);
-  document.execCommand("styleWithCSS", false, false);
-  afterEdit();
-}
-
 function applyForeColor(color) {
   body().focus();
   document.execCommand("styleWithCSS", false, true);
@@ -653,24 +644,33 @@ function main() {
     }
   });
 
-  // 직접 고르기 (컬러 휠) — 피커를 열기 전 선택 영역을 기억해 두고, 고르는 대로 실시간 적용
-  const wireCustomColor = (inputId, paletteId, apply) => {
+  // 직접 고르기 (컬러 휠) — OS 피커가 포커스를 가져가도 동작하도록
+  // 기억해 둔 선택 영역을 span으로 직접 감싸고, 고르는 동안은 그 span의 색만 바꾼다
+  const wireCustomColor = (inputId, paletteId, prop) => {
     const inp = $(inputId);
-    inp.addEventListener("mousedown", rememberRange);
-    inp.addEventListener("input", () => apply(inp.value));
-    inp.addEventListener("change", () => {
-      apply(inp.value);
-      $(paletteId).hidden = true;
-    });
+    let session = null; // 이번 피커 세션에서 만든 span
+    inp.addEventListener("mousedown", () => { rememberRange(); session = null; });
+    const paint = () => {
+      if (session && session.isConnected) {
+        session.style[prop] = inp.value;
+      } else if (savedRange && !savedRange.collapsed) {
+        const span = document.createElement("span");
+        span.style[prop] = inp.value;
+        const range = savedRange.cloneRange();
+        try { range.surroundContents(span); }
+        catch { span.appendChild(range.extractContents()); range.insertNode(span); }
+        session = span;
+        savedRange = null;
+      } else {
+        return; // 선택해 둔 글자가 없으면 할 일 없음
+      }
+      afterEdit();
+    };
+    inp.addEventListener("input", paint);
+    inp.addEventListener("change", () => { paint(); $(paletteId).hidden = true; });
   };
-  wireCustomColor("hl-color", "hl-palette", c => applyHighlightColor(c));
-  wireCustomColor("fc-color", "fc-palette", c => {
-    restoreRangeOrEnd();
-    document.execCommand("styleWithCSS", false, true);
-    document.execCommand("foreColor", false, c);
-    document.execCommand("styleWithCSS", false, false);
-    afterEdit();
-  });
+  wireCustomColor("hl-color", "hl-palette", "backgroundColor");
+  wireCustomColor("fc-color", "fc-palette", "color");
 
   // 글꼴 셀렉트 — 열기 전에 선택 영역을 기억했다가 적용 직전에 복원
   const fontSel = $("font-select");
