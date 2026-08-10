@@ -68,6 +68,7 @@ function cleanNode(parent) {
       const left = isTbox ? child.style.left : "";
       const top = isTbox ? child.style.top : "";
       const w = isTbox ? child.style.width : "";
+      const dtop = isTbox ? (child.getAttribute("data-top") || "") : "";
       [...child.attributes].forEach(a => child.removeAttribute(a.name));
       if (bg && bg !== "transparent") child.style.backgroundColor = bg;
       if (ff) child.style.fontFamily = ff;
@@ -80,6 +81,7 @@ function cleanNode(parent) {
         if (/^-?\d+(\.\d+)?px$/.test(left)) child.style.left = left;
         if (/^-?\d+(\.\d+)?px$/.test(top)) child.style.top = top;
         if (/^\d+(\.\d+)?(px|%)$/.test(w)) child.style.width = w;
+        if (/^-?\d+(\.\d+)?$/.test(dtop)) child.setAttribute("data-top", dtop);
       } else if (isTboxBody) {
         child.className = "tbox-body";
       } else if (isPgbr) {
@@ -272,6 +274,27 @@ function syncDocInputs() {
   $("ls-input").value = docStyle.ls;
 }
 
+// 상자가 속한 페이지의 시작 y — 상자 앞의 마지막 페이지 나눔 아래쪽
+function pageStartFor(box, container) {
+  let prevBr = null;
+  container.querySelectorAll(".pgbr").forEach(br => {
+    if (br.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING) prevBr = br;
+  });
+  return prevBr ? prevBr.offsetTop + prevBr.offsetHeight : 0;
+}
+
+// 텍스트 상자의 저장 좌표(data-top)는 페이지 기준 — 렌더 시 페이지 시작점을 더해 배치한다
+function layoutBoxes(container) {
+  container.querySelectorAll(".tbox").forEach(box => {
+    let rel = parseFloat(box.dataset.top);
+    if (isNaN(rel)) { // 구버전 상자: 절대 좌표를 페이지 기준으로 승격
+      rel = parseFloat(box.style.top) || 0;
+      box.dataset.top = String(rel);
+    }
+    box.style.top = (pageStartFor(box, container) + rel) + "px";
+  });
+}
+
 // 절대 위치 텍스트 상자가 컨테이너 높이 밖으로 나가지 않게 늘려준다
 function fitBoxHeight(container, base = 0) {
   let max = 0;
@@ -284,20 +307,39 @@ function fitBoxHeight(container, base = 0) {
 // ——— 텍스트 상자 — 드래그로 자유 배치 ———
 
 function insertTextBox() {
+  const sel = document.getSelection();
+  const inBody = sel.rangeCount && body().contains(sel.anchorNode);
+  const hasSel = inBody && !sel.isCollapsed;
+  const selRange = inBody ? sel.getRangeAt(0).cloneRange() : null;
+
   const n = body().querySelectorAll(".tbox").length;
   const box = document.createElement("div");
   box.className = "tbox";
+  box.dataset.top = String(24 + n * 18); // 페이지 기준 좌표
   box.style.left = (24 + n * 18) + "px";
-  box.style.top = (24 + n * 18) + "px";
   box.style.width = "180px";
   box.innerHTML =
     '<span class="tbox-handle" contenteditable="false" title="드래그해서 옮기기">⠿</span>' +
-    '<span class="tbox-x" contenteditable="false" title="상자 삭제">✕</span>' +
-    '<div class="tbox-body">텍스트 상자</div>';
-  body().appendChild(box);
+    '<span class="tbox-x" contenteditable="false" title="상자 삭제">✕</span>';
+  const boxBody = document.createElement("div");
+  boxBody.className = "tbox-body";
+  box.appendChild(boxBody);
+
+  // 드래그로 선택한 텍스트가 있으면 그대로 상자 안으로 옮긴다
+  if (hasSel) boxBody.appendChild(selRange.extractContents());
+  if (!boxBody.textContent.trim() && !boxBody.querySelector("img")) {
+    boxBody.textContent = "텍스트 상자";
+  }
+
+  // 커서(선택)가 있던 페이지의 블록 뒤에 삽입 — 상자는 그 페이지 소속이 된다
+  let node = selRange ? selRange.endContainer : null;
+  while (node && node.parentNode && node.parentNode !== body()) node = node.parentNode;
+  if (node && node.parentNode === body()) body().insertBefore(box, node.nextSibling);
+  else body().appendChild(box);
+
+  layoutBoxes(body());
   const r = document.createRange();
-  r.selectNodeContents(box.querySelector(".tbox-body"));
-  const sel = document.getSelection();
+  r.selectNodeContents(boxBody);
   sel.removeAllRanges();
   sel.addRange(r);
   body().focus();
@@ -329,6 +371,9 @@ function startBoxDrag(e) {
   const up = () => {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
+    // 놓은 위치를 페이지 기준 좌표로 환산해 저장
+    const start = pageStartFor(box, body());
+    box.dataset.top = String(Math.max(0, (parseFloat(box.style.top) || 0) - start));
     afterEdit();
   };
   window.addEventListener("pointermove", move);
@@ -386,6 +431,7 @@ function restoreDraft() {
   catch { return; }
   if (!draft) return;
   body().innerHTML = sanitizeHtml(draft.html || "");
+  layoutBoxes(body());
   docStyle.width = draft.width || 0;
   docStyle.lh = draft.lh || "1.85";
   docStyle.ls = draft.ls || "0";
@@ -406,6 +452,7 @@ function renderPreviewPane() {
   if (pvPageIdx > pages.length - 1) pvPageIdx = pages.length - 1;
   if (pvPageIdx < 0) pvPageIdx = 0;
   pb.innerHTML = flip ? pages[pvPageIdx] : html;
+  layoutBoxes(pb);
   if (nav) nav.hidden = !flip;
   if (flip) {
     $("pv-ind").textContent = `${pvPageIdx + 1} / ${pages.length}`;
@@ -420,6 +467,7 @@ function renderPreviewPane() {
 function afterEdit() {
   updateCharCount();
   refreshToolbarState();
+  layoutBoxes(body());
   renderPreviewPane();
   fitBoxHeight(body(), 380);
   saveDraft();
@@ -462,6 +510,7 @@ function beginEdit(p) {
   editingId = p.id;
   $("save-btn").textContent = "수정 완료";
   body().innerHTML = sanitizeHtml(p.html);
+  layoutBoxes(body());
   docStyle.width = p.width || 0;
   docStyle.lh = p.lh || "1.85";
   docStyle.ls = p.ls || "0";
@@ -549,6 +598,7 @@ function renderViewBody() {
   const nav = $("v-pagenav");
   const flip = !!nav && viewMode === "flip";
   vb.innerHTML = flip ? viewPages[viewPageIdx] : viewPages.join('<div class="pgbr"></div>');
+  layoutBoxes(vb);
   if (nav) nav.hidden = !flip;
   if (flip) {
     $("pg-ind").textContent = `${viewPageIdx + 1} / ${viewPages.length}`;
