@@ -107,7 +107,9 @@ body {
 .doc-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 3px;
+  row-gap: 4px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--line);
   background: #fafbfb;
@@ -136,6 +138,49 @@ body {
   color: var(--accent);
 }
 .doc-toolbar button svg { display: block; margin: 0 auto; }
+
+.tb-select {
+  height: 22px;
+  font-family: var(--sans);
+  font-size: 10px;
+  color: var(--body);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.tb-select:hover { border-color: var(--muted); }
+.tb-select:focus { outline: none; border-color: var(--muted); }
+.tb-select-num { font-family: var(--mono); font-size: 9.5px; }
+
+/* 형광펜 팔레트 */
+.hl-wrap { position: relative; display: inline-flex; }
+.hl-palette {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  display: flex;
+  gap: 3px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 8px rgba(28, 33, 39, .08);
+}
+.hl-palette button {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  padding: 0;
+}
+.hl-palette button:hover { border-color: var(--muted); }
+.hl-palette .hl-clear {
+  background: #fff;
+  font-size: 9px;
+  color: var(--muted);
+}
 .tb-sep {
   width: 1px;
   height: 14px;
@@ -165,11 +210,20 @@ body {
   cursor: text;
 }
 .doc-body:focus { outline: none; }
-.doc-body mark, .v-body mark, .doc-body span[style] {
+.doc-body mark, .v-body mark {
   background: var(--accent-fill);
   color: inherit;
   padding: 0 1px;
 }
+
+/* 글자 크기 — execCommand fontSize의 1~7 단계를 실제 px로 */
+.doc-body font[size="1"], .v-body font[size="1"] { font-size: 9px; }
+.doc-body font[size="2"], .v-body font[size="2"] { font-size: 10.5px; }
+.doc-body font[size="3"], .v-body font[size="3"] { font-size: 11.5px; }
+.doc-body font[size="4"], .v-body font[size="4"] { font-size: 13px; }
+.doc-body font[size="5"], .v-body font[size="5"] { font-size: 15px; }
+.doc-body font[size="6"], .v-body font[size="6"] { font-size: 18px; }
+.doc-body font[size="7"], .v-body font[size="7"] { font-size: 22px; }
 .doc-body img, .v-body img {
   max-width: 100%;
   display: block;
@@ -339,11 +393,6 @@ body {
   color: var(--body);
   overflow-wrap: anywhere;
 }
-.v-body span[style] {
-  background: var(--accent-fill);
-  padding: 0 1px;
-}
-
 .v-actions {
   display: flex;
   gap: 6px;

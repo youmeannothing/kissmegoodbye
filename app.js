@@ -7,7 +7,11 @@
 
 const PIECES_KEY = "kmg_pieces";
 const DRAFT_KEY = "kmg_draft";
-const HL_COLOR = "rgb(244, 231, 233)"; // --accent-fill
+// 형광펜 팔레트 (index.html의 data-hl과 동일)
+const HL_COLORS = [
+  "rgb(251, 244, 206)", "rgb(244, 231, 233)", "rgb(227, 240, 228)",
+  "rgb(226, 236, 246)", "rgb(236, 230, 244)",
+];
 
 const fmtStamp = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
@@ -21,7 +25,7 @@ const body = () => $("f-body");
 
 const ALLOWED_TAGS = new Set([
   "B", "STRONG", "I", "EM", "U", "S", "STRIKE", "DEL",
-  "MARK", "BR", "DIV", "P", "SPAN", "IMG",
+  "MARK", "BR", "DIV", "P", "SPAN", "IMG", "FONT",
 ]);
 
 function cleanNode(parent) {
@@ -34,10 +38,24 @@ function cleanNode(parent) {
       const src = child.getAttribute("src") || "";
       if (!src.startsWith("data:image/")) { child.remove(); return; }
       [...child.attributes].forEach(a => { if (a.name !== "src") child.removeAttribute(a.name); });
+    } else if (tag === "FONT") {
+      // 글꼴·크기 지정 (execCommand fontName/fontSize 산출물)
+      const face = child.getAttribute("face") || "";
+      const size = child.getAttribute("size") || "";
+      [...child.attributes].forEach(a => child.removeAttribute(a.name));
+      if (face) child.setAttribute("face", face);
+      if (/^[1-7]$/.test(size)) child.setAttribute("size", size);
     } else if (ALLOWED_TAGS.has(tag)) {
       const bg = tag === "SPAN" ? child.style.backgroundColor : "";
+      const ff = tag === "SPAN" ? child.style.fontFamily : "";
+      const fsz = tag === "SPAN" ? child.style.fontSize : "";
+      const align = (tag === "DIV" || tag === "P")
+        ? (child.style.textAlign || child.getAttribute("align") || "") : "";
       [...child.attributes].forEach(a => child.removeAttribute(a.name));
       if (bg && bg !== "transparent") child.style.backgroundColor = bg;
+      if (ff) child.style.fontFamily = ff;
+      if (/^\d+(\.\d+)?px$/.test(fsz)) child.style.fontSize = fsz;
+      if (/^(left|center|right|justify)$/.test(align)) child.style.textAlign = align;
     } else {
       while (child.firstChild) parent.insertBefore(child.firstChild, child);
       child.remove();
@@ -148,30 +166,54 @@ function exec(cmd, value = null) {
   afterEdit();
 }
 
-function toggleHighlight() {
-  const current = document.queryCommandValue("hiliteColor");
+// "rgb(251, 244, 206)" → "251,244,206" — 브라우저마다 다른 표기를 통일해 비교
+function normColor(c) {
+  const nums = (c || "").match(/\d+(\.\d+)?/g);
+  return nums ? nums.slice(0, 3).join(",") : "";
+}
+
+function applyHighlight(color) {
   body().focus();
+  // 쓰기는 hiliteColor, 읽기는 backColor (크롬은 hiliteColor 값을 못 읽는다)
+  const current = normColor(document.queryCommandValue("backColor"));
+  // 같은 색을 다시 고르면 끈다
+  const target = color === "transparent" || normColor(color) === current
+    ? "transparent" : color;
   document.execCommand("styleWithCSS", false, true); // 형광펜만 span 배경색으로
-  document.execCommand("hiliteColor", false, current === HL_COLOR ? "transparent" : HL_COLOR);
+  document.execCommand("hiliteColor", false, target);
   document.execCommand("styleWithCSS", false, false);
   afterEdit();
 }
 
-// 선택 영역의 꾸밈 상태를 툴바 버튼에 반영
+// 선택 영역의 꾸밈 상태를 툴바에 반영
 function refreshToolbarState() {
   const sel = document.getSelection();
   const inside = sel.rangeCount && body().contains(sel.anchorNode);
   document.querySelectorAll("#toolbar button[data-cmd]").forEach(btn => {
     const cmd = btn.dataset.cmd;
     if (cmd === "undo" || cmd === "redo") return;
-    let on = false;
-    if (inside) {
-      on = cmd === "highlight"
-        ? document.queryCommandValue("hiliteColor") === HL_COLOR
-        : document.queryCommandState(cmd);
-    }
-    btn.classList.toggle("on", on);
+    btn.classList.toggle("on", inside && document.queryCommandState(cmd));
   });
+  const hlNow = inside ? normColor(document.queryCommandValue("backColor")) : "";
+  $("hl-btn").classList.toggle("on", HL_COLORS.some(c => normColor(c) === hlNow));
+
+  // 커서 위치의 글꼴·크기를 셀렉트에 반영
+  if (inside) {
+    const fontSel = $("font-select");
+    const fn = (document.queryCommandValue("fontName") || "")
+      .replace(/['"]/g, "").split(",")[0].trim().toLowerCase();
+    const match = [...fontSel.options].find(o => o.value.toLowerCase() === fn);
+    fontSel.value = match ? match.value : "Pretendard Variable";
+    // 크롬의 legacy 크기표 대신 실제 px를 읽어 가장 가까운 단계로 표시
+    let el = sel.anchorNode;
+    if (el && el.nodeType === Node.TEXT_NODE) el = el.parentElement;
+    if (el && body().contains(el)) {
+      const px = parseFloat(getComputedStyle(el).fontSize);
+      const steps = [[1, 9], [2, 10.5], [3, 11.5], [4, 13], [5, 15], [6, 18], [7, 22]];
+      const [step] = steps.reduce((a, b) => Math.abs(b[1] - px) < Math.abs(a[1] - px) ? b : a);
+      $("size-select").value = String(step);
+    }
+  }
 }
 
 // ——— 임시 저장 (draft) ———
@@ -408,16 +450,44 @@ function main() {
   updateCharCount();
   renderPreviewPane();
 
-  // 툴바 — mousedown을 막아 본문 선택이 풀리지 않게 한다
+  // 툴바 — mousedown을 막아 본문 선택이 풀리지 않게 한다 (셀렉트는 예외)
   const toolbar = $("toolbar");
-  toolbar.addEventListener("mousedown", e => e.preventDefault());
+  toolbar.addEventListener("mousedown", e => {
+    if (!e.target.closest("select")) e.preventDefault();
+  });
   toolbar.addEventListener("click", e => {
     const btn = e.target.closest("button[data-cmd]");
-    if (!btn) return;
-    const cmd = btn.dataset.cmd;
-    if (cmd === "highlight") toggleHighlight();
-    else exec(cmd);
+    if (btn) exec(btn.dataset.cmd);
   });
+
+  // 형광펜 팔레트
+  $("hl-btn").onclick = () => { $("hl-palette").hidden = !$("hl-palette").hidden; };
+  $("hl-palette").addEventListener("click", e => {
+    const sw = e.target.closest("button[data-hl]");
+    if (!sw) return;
+    applyHighlight(sw.dataset.hl);
+    $("hl-palette").hidden = true;
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".hl-wrap")) $("hl-palette").hidden = true;
+  });
+
+  // 글꼴·크기 셀렉트 — 열기 전에 선택 영역을 기억했다가 적용 직전에 복원
+  const fontSel = $("font-select");
+  const sizeSel = $("size-select");
+  [fontSel, sizeSel].forEach(sel => sel.addEventListener("mousedown", rememberRange));
+  fontSel.onchange = () => {
+    restoreRangeOrEnd();
+    document.execCommand("styleWithCSS", false, false);
+    document.execCommand("fontName", false, fontSel.value);
+    afterEdit();
+  };
+  sizeSel.onchange = () => {
+    restoreRangeOrEnd();
+    document.execCommand("styleWithCSS", false, false);
+    document.execCommand("fontSize", false, sizeSel.value);
+    afterEdit();
+  };
 
   document.addEventListener("selectionchange", refreshToolbarState);
 
