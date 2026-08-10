@@ -862,33 +862,34 @@ function main() {
   };
   // 줄간 — 선택이 걸친 문단들에만, 선택이 없으면 문서 전체에
   const lhInput = $("lh-input");
-  let lhBlocks = null;
-  const captureLhBlocks = () => {
+  let lhRange = null;
+  const trackLh = () => {
     const sel = document.getSelection();
-    lhBlocks = null;
-    if (!sel.rangeCount || sel.isCollapsed || !body().contains(sel.anchorNode)) return;
-    wrapInlineRuns();
-    const range = sel.getRangeAt(0);
-    const blocks = [...body().children].filter(el =>
-      /^(DIV|P)$/.test(el.tagName) &&
-      !el.classList.contains("pgbr") && !el.classList.contains("tbox") &&
-      range.intersectsNode(el));
-    if (blocks.length) lhBlocks = blocks;
+    if (!sel.rangeCount || !body().contains(sel.anchorNode)) return;
+    const ae = document.activeElement;
+    if (sel.isCollapsed && ae !== body() && !body().contains(ae)) return;
+    lhRange = sel.isCollapsed ? null : sel.getRangeAt(0).cloneRange();
   };
-  lhInput.addEventListener("mousedown", captureLhBlocks);
-  lhInput.addEventListener("focus", captureLhBlocks);
+  document.addEventListener("selectionchange", trackLh);
   const applyLh = () => {
     const raw = parseFloat(lhInput.value);
     if (isNaN(raw)) return; // 입력 중간 상태는 무시
     const v = Math.min(5, Math.max(0.5, raw));
-    if (lhBlocks && lhBlocks.every(el => el.isConnected)) {
-      lhBlocks.forEach(el => { el.style.lineHeight = String(v); });
-      afterEdit();
-    } else {
-      docStyle.lh = String(v);
-      applyDocStyle();
-      saveDraft();
+    if (lhRange) {
+      wrapInlineRuns(); // 문단 단위 적용을 위해 흩어진 인라인을 묶는다 (range는 노드를 따라간다)
+      const blocks = [...body().children].filter(el =>
+        /^(DIV|P)$/.test(el.tagName) &&
+        !el.classList.contains("pgbr") && !el.classList.contains("tbox") &&
+        lhRange.intersectsNode(el));
+      if (blocks.length) {
+        blocks.forEach(el => { el.style.lineHeight = String(v); });
+        afterEdit();
+        return;
+      }
     }
+    docStyle.lh = String(v);
+    applyDocStyle();
+    saveDraft();
   };
   lhInput.addEventListener("input", applyLh);
   lhInput.onchange = () => {
@@ -899,18 +900,21 @@ function main() {
   const lsInput = $("ls-input");
   let lsRange = null;   // 새로 잡은 선택 영역
   let lsSession = null; // 이번 조정에서 만든 span — 연속 조정 시 이 span만 갱신
-  const captureLsRange = () => {
+  // 선택이 바뀔 때마다 추적해 둔다 — 입력칸에 포커스가 가면서 선택이 걷혀도
+  // 본문 밖에서 일어난 변화는 무시하므로 마지막 본문 선택이 살아 있다
+  const trackLs = () => {
     const sel = document.getSelection();
-    // 직전에 만든 span이 그대로 선택돼 있으면 세션 유지 (span 중첩 방지)
-    const inSession = lsSession && lsSession.isConnected && sel.rangeCount &&
+    if (!sel.rangeCount || !body().contains(sel.anchorNode)) return;
+    // 포커스가 에디터 밖(입력칸 등)에 있을 때 일어나는 선택 붕괴는 무시 — 마지막 선택 유지
+    const ae = document.activeElement;
+    if (sel.isCollapsed && ae !== body() && !body().contains(ae)) return;
+    const inSession = !sel.isCollapsed && lsSession && lsSession.isConnected &&
       lsSession.contains(sel.anchorNode) && lsSession.contains(sel.focusNode);
-    if (inSession) return;
-    lsSession = null; // 선택이 다른 곳으로 옮겨갔으면 이전 세션은 끝
-    lsRange = (sel.rangeCount && !sel.isCollapsed && body().contains(sel.anchorNode))
-      ? sel.getRangeAt(0).cloneRange() : null;
+    if (inSession) { lsRange = null; return; } // 같은 부분 재선택 — 세션 유지(span 중첩 방지)
+    lsSession = null;
+    lsRange = sel.isCollapsed ? null : sel.getRangeAt(0).cloneRange();
   };
-  lsInput.addEventListener("mousedown", captureLsRange);
-  lsInput.addEventListener("focus", captureLsRange);
+  document.addEventListener("selectionchange", trackLs);
   const applyLs = () => {
     const raw = parseFloat(lsInput.value);
     if (isNaN(raw)) return; // 입력 중간 상태는 무시
