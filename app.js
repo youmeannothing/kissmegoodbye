@@ -706,20 +706,21 @@ function main() {
   // 문서 설정 — 종이 폭 · 줄간 · 자간
   $("width-input").onchange = e => {
     const v = parseInt(e.target.value, 10);
-    docStyle.width = v ? Math.min(2000, Math.max(280, v)) : 0;
+    docStyle.width = v ? Math.min(3000, Math.max(200, v)) : 0;
     e.target.value = docStyle.width || "";
     applyDocStyle();
     saveDraft();
   };
   $("lh-input").onchange = e => {
-    const v = Math.min(4, Math.max(1, parseFloat(e.target.value) || 1.85));
+    const v = Math.min(5, Math.max(0.5, parseFloat(e.target.value) || 1.85));
     docStyle.lh = String(v);
     e.target.value = v;
     applyDocStyle();
     saveDraft();
   };
   $("ls-input").onchange = e => {
-    const v = Math.min(0.5, Math.max(-0.1, parseFloat(e.target.value) || 0));
+    const raw = parseFloat(e.target.value);
+    const v = Math.min(1, Math.max(-0.5, isNaN(raw) ? 0 : raw));
     docStyle.ls = String(v);
     e.target.value = v;
     applyDocStyle();
