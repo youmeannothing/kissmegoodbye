@@ -350,8 +350,8 @@ body {
 .doc-body .tbox:hover .tbox-r, .doc-body .tbox:focus-within .tbox-r {
   display: block;
 }
-/* 높이를 지정한 상자는 내용이 넘치면 잘라낸다 */
-.tbox[style*="height"] { overflow: hidden; }
+/* 높이를 지정한 상자는 내용이 넘치면 잘라낸다 — 핸들(⠿ ✕ ◢)은 상자 밖이라 내용물에만 적용 */
+.tbox[style*="height"] .tbox-body { height: 100%; overflow: hidden; }
 /* 미리보기·상세보기에서는 상자 테두리·핸들 없이 내용만 */
 .v-body { position: relative; }
 .v-body .tbox-handle, .v-body .tbox-x, .v-body .tbox-r { display: none; }
