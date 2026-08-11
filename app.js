@@ -613,23 +613,26 @@ function renderList() {
 }
 
 // 페이지 나눔(.pgbr) 기준으로 문서를 장별 html 배열로 쪼갠다
+// Range 추출을 쓰므로 나눔이 문단 블록 안에 중첩돼 있어도 정확히 갈라진다
 function splitPages(html) {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
-  const pages = [document.createElement("div")];
-  [...tmp.childNodes].forEach(n => {
-    if (n.nodeType === Node.ELEMENT_NODE && n.classList.contains("pgbr")) {
-      pages.push(document.createElement("div"));
-      return;
-    }
-    pages[pages.length - 1].appendChild(n);
-    // 나눔이 블록 안에 중첩된 경우 그 블록 뒤에서 장을 끊는다
-    if (n.nodeType === Node.ELEMENT_NODE && n.querySelector?.(".pgbr")) {
-      pages.push(document.createElement("div"));
-    }
-  });
+  const pages = [];
+  let br;
+  while ((br = tmp.querySelector(".pgbr"))) {
+    const range = document.createRange();
+    range.setStart(tmp, 0);
+    range.setEndBefore(br);
+    const holder = document.createElement("div");
+    holder.appendChild(range.extractContents());
+    pages.push(holder);
+    br.remove();
+  }
+  const last = document.createElement("div");
+  while (tmp.firstChild) last.appendChild(tmp.firstChild);
+  pages.push(last);
   const nonEmpty = pages.filter(p => p.textContent.trim() || p.querySelector("img"));
-  return (nonEmpty.length ? nonEmpty : [pages[0]]).map(p => p.innerHTML);
+  return (nonEmpty.length ? nonEmpty : [last]).map(p => p.innerHTML);
 }
 
 // 보기 방식: scroll(이어서) | flip(넘겨서) — 선택을 기억한다
