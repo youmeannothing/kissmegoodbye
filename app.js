@@ -750,6 +750,8 @@ function viewPiece(p) {
 
   $("v-edit").onclick = () => { dlg.close(); beginEdit(p); };
   $("v-download").onclick = () => downloadTxt(p);
+  const pdfBtn = $("v-pdf");
+  if (pdfBtn) pdfBtn.onclick = () => printPdf(p);
   $("v-del").onclick = () => {
     if (!confirm(`「${pieceTitle(p)}」을(를) 삭제할까요? 되돌릴 수 없습니다.`)) return;
     dlg.close();
@@ -758,6 +760,32 @@ function viewPiece(p) {
   };
   dlg.showModal();
   renderViewBody(); // 다이얼로그가 열린 뒤에야 상자 높이를 잴 수 있다
+}
+
+// ——— PDF — 브라우저 인쇄 엔진으로 진짜 텍스트 PDF를 만든다 ———
+
+function printPdf(p) {
+  const root = $("print-root");
+  if (!root) return;
+  root.innerHTML = "";
+  const m = marginsOf(p);
+  splitPages(sanitizeHtml(p.html)).forEach(html => {
+    const pg = document.createElement("div");
+    pg.className = "print-page v-body";
+    pg.style.lineHeight = p.lh || "1.85";
+    pg.style.letterSpacing = (p.ls || "0") + "em";
+    pg.style.padding =
+      `${m.mt || 26}px ${m.mr || 28}px ${m.mb || 26}px ${m.ml || 28}px`;
+    pg.innerHTML = html;
+    root.appendChild(pg);
+    layoutBoxes(pg);
+    fitBoxHeight(pg);
+  });
+  const prevTitle = document.title;
+  document.title = pieceTitle(p); // 인쇄 대화상자의 기본 파일명
+  window.print();               // 대상: 'PDF로 저장'
+  document.title = prevTitle;
+  root.innerHTML = "";
 }
 
 // ——— 파일로 저장 ———
