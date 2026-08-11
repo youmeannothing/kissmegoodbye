@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&family=Noto+Serif+KR:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/css/batang.css">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 
@@ -93,7 +93,7 @@
           </button>
           <span class="tb-sep" aria-hidden="true"></span>
           <label class="tb-num"><span>종이</span><input type="number" id="width-input" min="200" max="3000" step="10" placeholder="자동" title="종이 폭 (px) — 비우면 자동"></label>
-          <label class="tb-num"><span>여백</span><input type="number" id="mg-input" min="0" max="200" step="2" placeholder="기본" title="페이지 여백 (px) — 비우면 기본"></label>
+          <label class="tb-num"><span>여백</span><input type="number" id="mgy-input" min="0" max="300" step="2" placeholder="상하" title="위아래 여백 (px) — 비우면 기본"><input type="number" id="mgx-input" min="0" max="300" step="2" placeholder="좌우" title="좌우 여백 (px) — 비우면 기본"></label>
           <label class="tb-num"><span>줄간</span><input type="number" id="lh-input" min="0.5" max="5" step="0.05" value="1.85" title="줄 간격 (배수) — 드래그로 선택한 문단이 있으면 그 문단에만"></label>
           <label class="tb-num"><span>자간</span><input type="number" id="ls-input" min="-0.5" max="1" step="0.01" value="0" title="자간 (em) — 드래그로 선택한 부분이 있으면 그 부분에만"></label>
           <span class="tb-count"><b id="char-count">0</b>자</span>
@@ -136,7 +136,7 @@
       &nbsp;·&nbsp;
       <button type="button" id="import-btn" class="corner-link">가져오기</button>
       <input type="file" id="f-import" accept=".json" hidden>
-      <br>♪ <span class="ph">&nbsp;&nbsp;Angela Aki&nbsp;&nbsp;&nbsp;—&nbsp;&nbsp;Kiss Me Good-Bye</span>&nbsp;&nbsp;·&nbsp;&nbsp;<span class="ph" id="ver">v20</span>
+      <br>♪ <span class="ph">&nbsp;&nbsp;Angela Aki&nbsp;&nbsp;&nbsp;—&nbsp;&nbsp;Kiss Me Good-Bye</span>&nbsp;&nbsp;·&nbsp;&nbsp;<span class="ph" id="ver">v21</span>
     </div>
   </div>
 
@@ -161,6 +161,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

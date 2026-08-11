@@ -284,13 +284,17 @@ function makeSelectionStyler(styleProp, format) {
 
 // ——— 문서 설정 (종이 폭 · 줄간 · 자간) ———
 
-const docStyle = { width: 0, lh: "1.85", ls: "0", margin: 0 };
+const docStyle = { width: 0, lh: "1.85", ls: "0", mgy: 0, mgx: 0 };
 
-// 요소에 페이지 여백(px)을 적용 — 0이면 기본값(CSS)으로 되돌린다
-function setMargin(el, m) {
-  el.style.padding = m ? m + "px" : "";
-  if (m) el.style.setProperty("--pgm", m + "px"); // 페이지 나눔 띠의 좌우 돌출 폭
-  else el.style.removeProperty("--pgm");
+// 요소에 페이지 여백(px)을 적용 — 상하·좌우 각각, 0이면 기본값(CSS)으로
+function setMargin(el, my, mx, defX = 28) {
+  if (!my && !mx) {
+    el.style.padding = "";
+    el.style.removeProperty("--pgm");
+    return;
+  }
+  el.style.padding = `${my || 26}px ${mx || defX}px`;
+  el.style.setProperty("--pgm", (mx || defX) + "px"); // 페이지 나눔 띠의 좌우 돌출 폭
 }
 
 function applyDocStyle() {
@@ -303,7 +307,7 @@ function applyDocStyle() {
   [body(), $("p-body")].forEach(el => {
     el.style.lineHeight = docStyle.lh;
     el.style.letterSpacing = docStyle.ls + "em";
-    setMargin(el, docStyle.margin);
+    setMargin(el, docStyle.mgy, docStyle.mgx);
   });
 }
 
@@ -311,7 +315,8 @@ function syncDocInputs() {
   $("width-input").value = docStyle.width || "";
   $("lh-input").value = docStyle.lh;
   $("ls-input").value = docStyle.ls;
-  $("mg-input").value = docStyle.margin || "";
+  $("mgy-input").value = docStyle.mgy || "";
+  $("mgx-input").value = docStyle.mgx || "";
 }
 
 // 최상위에 흩어진 인라인 노드들(첫 줄 등)을 문단 div로 묶는다 — 문단 단위 스타일을 걸기 위해
@@ -533,7 +538,8 @@ function restoreDraft() {
   docStyle.width = draft.width || 0;
   docStyle.lh = draft.lh || "1.85";
   docStyle.ls = draft.ls || "0";
-  docStyle.margin = draft.margin || 0;
+  docStyle.mgy = draft.mgy ?? draft.margin ?? 0;
+  docStyle.mgx = draft.mgx ?? draft.margin ?? 0;
   $("draft-note").hidden = isDocEmpty();
 }
 
@@ -613,7 +619,8 @@ function beginEdit(p) {
   docStyle.width = p.width || 0;
   docStyle.lh = p.lh || "1.85";
   docStyle.ls = p.ls || "0";
-  docStyle.margin = p.margin || 0;
+  docStyle.mgy = p.mgy ?? p.margin ?? 0;
+  docStyle.mgx = p.mgx ?? p.margin ?? 0;
   syncDocInputs();
   applyDocStyle();
   updateCharCount();
@@ -723,7 +730,7 @@ function viewPiece(p) {
   if (vmode) vmode.hidden = false; // 토글은 항상 표시 — 나눔 없는 글은 1/1
   vb.style.lineHeight = p.lh || "1.85";
   vb.style.letterSpacing = (p.ls || "0") + "em";
-  setMargin(vb, p.margin || 0);
+  setMargin(vb, p.mgy ?? p.margin ?? 0, p.mgx ?? p.margin ?? 0, 26);
   dlg.style.width = p.width
     ? Math.min(p.width + 54, Math.floor(window.innerWidth * 0.9)) + "px" : "";
 
@@ -950,14 +957,18 @@ function main() {
     applyDocStyle();
     saveDraft();
   };
-  // 페이지 여백
-  $("mg-input").onchange = e => {
-    const v = parseInt(e.target.value, 10);
-    docStyle.margin = v ? Math.min(200, Math.max(0, v)) : 0;
-    e.target.value = docStyle.margin || "";
-    applyDocStyle();
-    saveDraft();
+  // 페이지 여백 — 상하 · 좌우 각각
+  const wireMargin = (id, key) => {
+    $(id).onchange = e => {
+      const v = parseInt(e.target.value, 10);
+      docStyle[key] = v ? Math.min(300, Math.max(0, v)) : 0;
+      e.target.value = docStyle[key] || "";
+      applyDocStyle();
+      saveDraft();
+    };
   };
+  wireMargin("mgy-input", "mgy");
+  wireMargin("mgx-input", "mgx");
 
   // 줄간 — 선택이 걸친 문단들에만, 선택이 없으면 문서 전체에
   const lhInput = $("lh-input");
