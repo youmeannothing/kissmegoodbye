@@ -784,40 +784,9 @@ async function loadPdfLibs() {
     await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
 }
 
-// 내보내는 글의 종이 폭 — 지금 편집 중인 문서 설정과 무관하게, 그 글이
-// 미리보기에서 보이는 폭 그대로 (자동이면 미리보기 기본 폭을 계산)
-function exportWidth(p) {
-  if (p.width) return p.width;
-  const ws = document.querySelector(".workspace");
-  if (!ws || !ws.clientWidth) return 460;
-  const twoCol = window.matchMedia("(min-width: 880px)").matches;
-  return Math.max(320, twoCol ? Math.floor((ws.clientWidth - 10) / 2) : ws.clientWidth);
-}
-
-// 조판: 글의 페이지들을 오프스크린에 만들어 돌려준다
-function buildExportPages(p) {
-  const root = $("print-root");
-  root.innerHTML = "";
-  const m = marginsOf(p);
-  const docW = exportWidth(p);
-  root.style.width = docW + "px";
-  const pages = splitPages(sanitizeHtml(p.html)).map(html => {
-    const pg = document.createElement("div");
-    pg.className = "print-page v-body";
-    pg.style.width = docW + "px";
-    pg.style.background = "#fff";
-    pg.style.lineHeight = p.lh || "1.85";
-    pg.style.letterSpacing = (p.ls || "0") + "em";
-    pg.style.padding =
-      `${m.mt || 26}px ${m.mr || 28}px ${m.mb || 26}px ${m.ml || 28}px`;
-    pg.innerHTML = html;
-    root.appendChild(pg);
-    layoutBoxes(pg);
-    fitBoxHeight(pg);
-    return pg;
-  });
-  return { pages, docW };
-}
+// 내보내기는 화면의 미리보기 창(#p-body) 그 자체를 캡처한다 —
+// 페이지를 실제 미리보기 컨테이너에 올려 찍으므로 폭·줄바꿈·간격이
+// 화면과 정의상 동일하다. 찍은 뒤 미리보기는 원래대로 복원.
 
 // "1-3, 5" → [0,1,2,4] (1부터 세는 페이지 번호를 인덱스로)
 function parseRange(str, max) {
@@ -870,29 +839,49 @@ function askRange(max) {
 }
 
 async function exportPiece(p, kind, btn) {
-  const root = $("print-root");
-  if (!root) return;
+  const pb = $("p-body");
+  if (!pb) return;
   const label = btn ? btn.textContent : "";
+  const restore = () => {
+    pb.style.background = "";
+    applyDocStyle();      // 미리보기 스타일을 현재 문서 설정으로 복원
+    renderPreviewPane();  // 미리보기 내용 복원
+  };
   try {
     if (btn) { btn.disabled = true; btn.textContent = "만드는 중…"; }
     await loadPdfLibs();
     await document.fonts.ready;
-    const { pages, docW } = buildExportPages(p);
+
+    const pages = splitPages(sanitizeHtml(p.html));
     const idxs = await askRange(pages.length);
-    if (!idxs) { root.innerHTML = ""; return; } // 취소
+    if (!idxs) return; // 취소
+
+    // 내보내는 글의 서식을 미리보기 컨테이너에 입힌다 (찍는 동안만)
+    pb.style.lineHeight = p.lh || "1.85";
+    pb.style.letterSpacing = (p.ls || "0") + "em";
+    setMargin(pb, marginsOf(p), 26);
+    pb.style.background = "#fff";
+
+    const docW = Math.max(1, pb.clientWidth);
     const scale = Math.min(3, 1600 / docW); // 인쇄 화질 (~190dpi)
     const name = pieceTitle(p).replace(/[\\/:*?"<>|]/g, "_")
       .slice(0, 40).replace(/[.\s]+$/, "") || "조각글";
-    const snap = el => window.htmlToImage.toCanvas(el, {
-      pixelRatio: scale, backgroundColor: "#ffffff",
-    });
+
+    const canvases = [];
+    for (const i of idxs) {
+      pb.innerHTML = pages[i];
+      layoutBoxes(pb);
+      fitBoxHeight(pb);
+      canvases.push([i, await window.htmlToImage.toCanvas(pb, {
+        pixelRatio: scale, backgroundColor: "#ffffff",
+      })]);
+    }
 
     if (kind === "pdf") {
       const { jsPDF } = window.jspdf;
       const W = 210; // PDF 폭은 A4 폭 기준, 높이는 페이지 내용 그대로
       let pdf = null;
-      for (const i of idxs) {
-        const canvas = await snap(pages[i]);
+      for (const [, canvas] of canvases) {
         const h = canvas.height * (W / canvas.width);
         if (!pdf) pdf = new jsPDF({ unit: "mm", format: [W, h], orientation: W > h ? "l" : "p" });
         else pdf.addPage([W, h], W > h ? "l" : "p");
@@ -900,18 +889,17 @@ async function exportPiece(p, kind, btn) {
       }
       if (pdf) pdf.save(name + ".pdf");
     } else {
-      for (const i of idxs) {
-        const canvas = await snap(pages[i]);
+      for (const [i, canvas] of canvases) {
         const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
         const suffix = pages.length > 1 ? `-${i + 1}쪽` : "";
         downloadBlob(blob, name + suffix + ".png");
       }
     }
-    root.innerHTML = "";
   } catch (err) {
     alert("저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
     console.error(err);
   } finally {
+    restore();
     if (btn) { btn.disabled = false; btn.textContent = label; }
   }
 }
