@@ -790,11 +790,12 @@ async function downloadPdf(p, btn) {
     await loadPdfLibs();
     await document.fonts.ready;
 
-    // 문서의 종이 폭 그대로 조판 — 미리보기와 같은 비율
+    // 미리보기 창의 실제 폭 그대로 조판 — 줄바꿈·자간이 화면과 완전히 일치
     root.innerHTML = "";
     const m = marginsOf(p);
-    const measured = document.querySelector(".workspace .paper")?.clientWidth || 460;
-    const docW = p.width || Math.min(1000, Math.max(360, measured));
+    const pvW = document.querySelector(".preview-pane")?.clientWidth
+      || document.querySelector(".workspace .paper")?.clientWidth || 460;
+    const docW = Math.max(320, pvW);
     root.style.width = docW + "px";
     const pages = splitPages(sanitizeHtml(p.html)).map(html => {
       const pg = document.createElement("div");
@@ -813,31 +814,19 @@ async function downloadPdf(p, btn) {
     });
 
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    const A4W = 210, A4H = 297;
+    const W = 210; // PDF 폭은 A4 폭 기준, 높이는 페이지 내용 그대로
     const scale = Math.min(3, 1600 / docW); // 인쇄 화질 (~190dpi)
+    let pdf = null;
 
-    for (let i = 0; i < pages.length; i++) {
-      const canvas = await window.html2canvas(pages[i], { scale, backgroundColor: "#ffffff" });
-      if (i > 0) pdf.addPage();
-      const imgH = canvas.height * (A4W / canvas.width);
-      if (imgH <= A4H + 0.5) {
-        pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, A4W, imgH);
-      } else {
-        // 한 장보다 길면 세로로 잘라 여러 장에 이어 담는다
-        const pagePx = Math.floor(canvas.width * (A4H / A4W));
-        for (let y = 0; y < canvas.height; y += pagePx) {
-          if (y > 0) pdf.addPage();
-          const slice = document.createElement("canvas");
-          slice.width = canvas.width;
-          slice.height = Math.min(pagePx, canvas.height - y);
-          slice.getContext("2d")
-            .drawImage(canvas, 0, y, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
-          pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG",
-            0, 0, A4W, slice.height * (A4W / canvas.width));
-        }
-      }
+    for (const page of pages) {
+      const canvas = await window.html2canvas(page, { scale, backgroundColor: "#ffffff" });
+      const h = canvas.height * (W / canvas.width);
+      const opt = { unit: "mm", format: [W, h], orientation: W > h ? "l" : "p" };
+      if (!pdf) pdf = new jsPDF(opt);
+      else pdf.addPage([W, h], W > h ? "l" : "p");
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, W, h);
     }
+    if (!pdf) throw new Error("빈 문서");
 
     const name = pieceTitle(p).replace(/[\\/:*?"<>|]/g, "_")
       .slice(0, 40).replace(/[.\s]+$/, "") || "조각글";
