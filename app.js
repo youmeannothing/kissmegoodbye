@@ -751,7 +751,7 @@ function viewPiece(p) {
   $("v-edit").onclick = () => { dlg.close(); beginEdit(p); };
   $("v-download").onclick = () => downloadTxt(p);
   const pdfBtn = $("v-pdf");
-  if (pdfBtn) pdfBtn.onclick = () => printPdf(p);
+  if (pdfBtn) pdfBtn.onclick = () => downloadPdf(p, pdfBtn);
   $("v-del").onclick = () => {
     if (!confirm(`「${pieceTitle(p)}」을(를) 삭제할까요? 되돌릴 수 없습니다.`)) return;
     dlg.close();
@@ -762,30 +762,93 @@ function viewPiece(p) {
   renderViewBody(); // 다이얼로그가 열린 뒤에야 상자 높이를 잴 수 있다
 }
 
-// ——— PDF — 브라우저 인쇄 엔진으로 진짜 텍스트 PDF를 만든다 ———
+// ——— PDF — 버튼 한 번으로 미리보기 모습 그대로 .pdf 다운로드 ———
 
-function printPdf(p) {
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("라이브러리를 불러오지 못했습니다"));
+    document.head.appendChild(s);
+  });
+}
+
+async function loadPdfLibs() {
+  if (!window.html2canvas)
+    await loadScript("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js");
+  if (!window.jspdf)
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+}
+
+async function downloadPdf(p, btn) {
   const root = $("print-root");
   if (!root) return;
-  root.innerHTML = "";
-  const m = marginsOf(p);
-  splitPages(sanitizeHtml(p.html)).forEach(html => {
-    const pg = document.createElement("div");
-    pg.className = "print-page v-body";
-    pg.style.lineHeight = p.lh || "1.85";
-    pg.style.letterSpacing = (p.ls || "0") + "em";
-    pg.style.padding =
-      `${m.mt || 26}px ${m.mr || 28}px ${m.mb || 26}px ${m.ml || 28}px`;
-    pg.innerHTML = html;
-    root.appendChild(pg);
-    layoutBoxes(pg);
-    fitBoxHeight(pg);
-  });
-  const prevTitle = document.title;
-  document.title = pieceTitle(p); // 인쇄 대화상자의 기본 파일명
-  window.print();               // 대상: 'PDF로 저장'
-  document.title = prevTitle;
-  root.innerHTML = "";
+  const label = btn ? btn.textContent : "";
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = "만드는 중…"; }
+    await loadPdfLibs();
+    await document.fonts.ready;
+
+    // 문서의 종이 폭 그대로 조판 — 미리보기와 같은 비율
+    root.innerHTML = "";
+    const m = marginsOf(p);
+    const measured = document.querySelector(".workspace .paper")?.clientWidth || 460;
+    const docW = p.width || Math.min(1000, Math.max(360, measured));
+    root.style.width = docW + "px";
+    const pages = splitPages(sanitizeHtml(p.html)).map(html => {
+      const pg = document.createElement("div");
+      pg.className = "print-page v-body";
+      pg.style.width = docW + "px";
+      pg.style.background = "#fff";
+      pg.style.lineHeight = p.lh || "1.85";
+      pg.style.letterSpacing = (p.ls || "0") + "em";
+      pg.style.padding =
+        `${m.mt || 26}px ${m.mr || 28}px ${m.mb || 26}px ${m.ml || 28}px`;
+      pg.innerHTML = html;
+      root.appendChild(pg);
+      layoutBoxes(pg);
+      fitBoxHeight(pg);
+      return pg;
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const A4W = 210, A4H = 297;
+    const scale = Math.min(3, 1600 / docW); // 인쇄 화질 (~190dpi)
+
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await window.html2canvas(pages[i], { scale, backgroundColor: "#ffffff" });
+      if (i > 0) pdf.addPage();
+      const imgH = canvas.height * (A4W / canvas.width);
+      if (imgH <= A4H + 0.5) {
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, A4W, imgH);
+      } else {
+        // 한 장보다 길면 세로로 잘라 여러 장에 이어 담는다
+        const pagePx = Math.floor(canvas.width * (A4H / A4W));
+        for (let y = 0; y < canvas.height; y += pagePx) {
+          if (y > 0) pdf.addPage();
+          const slice = document.createElement("canvas");
+          slice.width = canvas.width;
+          slice.height = Math.min(pagePx, canvas.height - y);
+          slice.getContext("2d")
+            .drawImage(canvas, 0, y, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+          pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG",
+            0, 0, A4W, slice.height * (A4W / canvas.width));
+        }
+      }
+    }
+
+    const name = pieceTitle(p).replace(/[\\/:*?"<>|]/g, "_")
+      .slice(0, 40).replace(/[.\s]+$/, "") || "조각글";
+    pdf.save(name + ".pdf");
+    root.innerHTML = "";
+  } catch (err) {
+    alert("PDF 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    console.error(err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
 }
 
 // ——— 파일로 저장 ———

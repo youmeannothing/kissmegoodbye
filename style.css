@@ -624,7 +624,7 @@ body {
     page-break-after: always;
   }
   .print-page:last-child { page-break-after: auto; }
-  @page { margin: 0; }
+  @page { size: A4 portrait; margin: 0; }
 }
 
 /* ——— corner ——— */
