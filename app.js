@@ -56,8 +56,11 @@ function cleanNode(parent) {
       const isTbox = isBlock && cls.contains("tbox");
       const isTboxBody = isBlock && cls.contains("tbox-body");
       const isPgbr = isBlock && cls.contains("pgbr");
-      const isHandle = isSpan && (cls.contains("tbox-handle") || cls.contains("tbox-x"));
-      const handleCls = isHandle ? (cls.contains("tbox-handle") ? "tbox-handle" : "tbox-x") : "";
+      const isHandle = isSpan &&
+        (cls.contains("tbox-handle") || cls.contains("tbox-x") || cls.contains("tbox-r"));
+      const handleCls = isHandle
+        ? (cls.contains("tbox-handle") ? "tbox-handle"
+          : cls.contains("tbox-x") ? "tbox-x" : "tbox-r") : "";
       const bg = isSpan ? child.style.backgroundColor : "";
       const ff = isSpan ? child.style.fontFamily : "";
       const fsz = isSpan ? child.style.fontSize : "";
@@ -69,6 +72,7 @@ function cleanNode(parent) {
       const left = isTbox ? child.style.left : "";
       const top = isTbox ? child.style.top : "";
       const w = isTbox ? child.style.width : "";
+      const h = isTbox ? child.style.height : "";
       const dtop = isTbox ? (child.getAttribute("data-top") || "") : "";
       [...child.attributes].forEach(a => child.removeAttribute(a.name));
       if (bg && bg !== "transparent") child.style.backgroundColor = bg;
@@ -83,6 +87,7 @@ function cleanNode(parent) {
         if (/^-?\d+(\.\d+)?px$/.test(left)) child.style.left = left;
         if (/^-?\d+(\.\d+)?px$/.test(top)) child.style.top = top;
         if (/^\d+(\.\d+)?(px|%)$/.test(w)) child.style.width = w;
+        if (/^\d+(\.\d+)?px$/.test(h)) child.style.height = h;
         if (/^-?\d+(\.\d+)?$/.test(dtop)) child.setAttribute("data-top", dtop);
       } else if (isTboxBody) {
         child.className = "tbox-body";
@@ -328,8 +333,22 @@ function pageStartFor(box, container) {
   return prevBr ? prevBr.offsetTop + prevBr.offsetHeight : 0;
 }
 
+// 예전 버전 상자에 크기 조절 그립이 없으면 에디터에서 채워 넣는다
+function ensureBoxChrome(container) {
+  container.querySelectorAll(".tbox").forEach(box => {
+    if (!box.querySelector(".tbox-r")) {
+      const grip = document.createElement("span");
+      grip.className = "tbox-r";
+      grip.setAttribute("contenteditable", "false");
+      grip.title = "크기 조절";
+      box.appendChild(grip);
+    }
+  });
+}
+
 // 텍스트 상자의 저장 좌표(data-top)는 페이지 기준 — 렌더 시 페이지 시작점을 더해 배치한다
 function layoutBoxes(container) {
+  if (container === body()) ensureBoxChrome(container);
   container.querySelectorAll(".tbox").forEach(box => {
     let rel = parseFloat(box.dataset.top);
     if (isNaN(rel)) { // 구버전 상자: 절대 좌표를 페이지 기준으로 승격
@@ -365,7 +384,8 @@ function insertTextBox() {
   box.style.width = "180px";
   box.innerHTML =
     '<span class="tbox-handle" contenteditable="false" title="드래그해서 옮기기">⠿</span>' +
-    '<span class="tbox-x" contenteditable="false" title="상자 삭제">✕</span>';
+    '<span class="tbox-x" contenteditable="false" title="상자 삭제">✕</span>' +
+    '<span class="tbox-r" contenteditable="false" title="크기 조절"></span>';
   const boxBody = document.createElement("div");
   boxBody.className = "tbox-body";
   box.appendChild(boxBody);
@@ -398,6 +418,30 @@ function insertPageBreak() {
   document.execCommand("insertHTML", false,
     '<div class="pgbr" contenteditable="false"></div><div><br></div>');
   afterEdit();
+}
+
+// 우하단 그립으로 가로·세로 크기 조절
+function startBoxResize(e) {
+  const grip = e.target.closest(".tbox-r");
+  if (!grip) return false;
+  const box = grip.closest(".tbox");
+  e.preventDefault();
+  const startW = box.offsetWidth;
+  const startH = box.offsetHeight;
+  const sx = e.clientX;
+  const sy = e.clientY;
+  const move = ev => {
+    box.style.width = Math.max(50, startW + ev.clientX - sx) + "px";
+    box.style.height = Math.max(26, startH + ev.clientY - sy) + "px";
+  };
+  const up = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    afterEdit();
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+  return true;
 }
 
 function startBoxDrag(e) {
@@ -878,7 +922,9 @@ function main() {
   // 텍스트 상자 · 페이지 나누기
   $("tbox-btn").onclick = insertTextBox;
   $("pgbr-btn").onclick = insertPageBreak;
-  body().addEventListener("pointerdown", startBoxDrag);
+  body().addEventListener("pointerdown", e => {
+    if (!startBoxResize(e)) startBoxDrag(e);
+  });
   body().addEventListener("click", e => {
     const x = e.target.closest(".tbox-x");
     if (x) { x.closest(".tbox").remove(); afterEdit(); }
