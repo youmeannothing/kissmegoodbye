@@ -194,6 +194,7 @@ body {
 }
 .tb-num input:hover { border-color: var(--muted); }
 .tb-num input:focus { outline: none; border-color: var(--muted); }
+.tb-num input.tb-mg { width: 38px; }
 
 .fc-btn { font-weight: 700; border-bottom: 2px solid var(--accent) !important; }
 
@@ -282,9 +283,9 @@ body {
   background: #eef0f2;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  margin: 18px calc(0px - var(--pgm, 28px));
+  margin: 18px calc(0px - var(--pgmr, 28px)) 18px calc(0px - var(--pgml, 28px));
 }
-#v-body .pgbr { margin: 18px calc(0px - var(--pgm, 26px)); }
+#v-body .pgbr { margin: 18px calc(0px - var(--pgmr, 26px)) 18px calc(0px - var(--pgml, 26px)); }
 .doc-body .pgbr {
   position: relative;
   cursor: default;
