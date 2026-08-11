@@ -627,6 +627,25 @@ body {
   @page { size: A4 portrait; margin: 0; }
 }
 
+/* ——— 내보낼 페이지 범위 다이얼로그 ——— */
+
+.range-dialog {
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 22px 24px;
+  width: min(300px, 86vw);
+  margin: auto;
+}
+.range-dialog::backdrop { background: rgba(28, 33, 39, 0.3); }
+.pw-heading {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+.range-dialog .hint { margin-top: 6px; }
+.range-dialog .form-actions { display: flex; gap: 6px; margin-top: 12px; }
+
 /* ——— corner ——— */
 
 .corner {

@@ -751,7 +751,9 @@ function viewPiece(p) {
   $("v-edit").onclick = () => { dlg.close(); beginEdit(p); };
   $("v-download").onclick = () => downloadTxt(p);
   const pdfBtn = $("v-pdf");
-  if (pdfBtn) pdfBtn.onclick = () => downloadPdf(p, pdfBtn);
+  if (pdfBtn) pdfBtn.onclick = () => exportPiece(p, "pdf", pdfBtn);
+  const pngBtn = $("v-png");
+  if (pngBtn) pngBtn.onclick = () => exportPiece(p, "png", pngBtn);
   $("v-del").onclick = () => {
     if (!confirm(`「${pieceTitle(p)}」을(를) 삭제할까요? 되돌릴 수 없습니다.`)) return;
     dlg.close();
@@ -782,7 +784,92 @@ async function loadPdfLibs() {
     await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
 }
 
-async function downloadPdf(p, btn) {
+// 내보내는 글의 종이 폭 — 지금 편집 중인 문서 설정과 무관하게, 그 글이
+// 미리보기에서 보이는 폭 그대로 (자동이면 미리보기 기본 폭을 계산)
+function exportWidth(p) {
+  if (p.width) return p.width;
+  const ws = document.querySelector(".workspace");
+  if (!ws || !ws.clientWidth) return 460;
+  const twoCol = window.matchMedia("(min-width: 880px)").matches;
+  return Math.max(320, twoCol ? Math.floor((ws.clientWidth - 10) / 2) : ws.clientWidth);
+}
+
+// 조판: 글의 페이지들을 오프스크린에 만들어 돌려준다
+function buildExportPages(p) {
+  const root = $("print-root");
+  root.innerHTML = "";
+  const m = marginsOf(p);
+  const docW = exportWidth(p);
+  root.style.width = docW + "px";
+  const pages = splitPages(sanitizeHtml(p.html)).map(html => {
+    const pg = document.createElement("div");
+    pg.className = "print-page v-body";
+    pg.style.width = docW + "px";
+    pg.style.background = "#fff";
+    pg.style.lineHeight = p.lh || "1.85";
+    pg.style.letterSpacing = (p.ls || "0") + "em";
+    pg.style.padding =
+      `${m.mt || 26}px ${m.mr || 28}px ${m.mb || 26}px ${m.ml || 28}px`;
+    pg.innerHTML = html;
+    root.appendChild(pg);
+    layoutBoxes(pg);
+    fitBoxHeight(pg);
+    return pg;
+  });
+  return { pages, docW };
+}
+
+// "1-3, 5" → [0,1,2,4] (1부터 세는 페이지 번호를 인덱스로)
+function parseRange(str, max) {
+  const s = (str || "").trim();
+  if (!s) return [...Array(max).keys()];
+  const out = new Set();
+  for (const part of s.split(",")) {
+    const t = part.trim();
+    if (!t) continue;
+    const mm = t.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (mm) {
+      for (let i = +mm[1]; i <= +mm[2]; i++) if (i >= 1 && i <= max) out.add(i - 1);
+    } else if (/^\d+$/.test(t)) {
+      if (+t >= 1 && +t <= max) out.add(+t - 1);
+    } else {
+      return null;
+    }
+  }
+  return out.size ? [...out].sort((a, b) => a - b) : null;
+}
+
+// 여러 페이지일 때 내보낼 범위를 묻는다 — 취소하면 null
+function askRange(max) {
+  return new Promise(resolve => {
+    const dlg = $("range-dialog");
+    if (!dlg || max <= 1) { resolve([...Array(max).keys()]); return; }
+    const input = $("range-input");
+    const form = dlg.querySelector("form");
+    input.value = "";
+    $("range-hint").textContent = `전체 ${max}쪽 — 비워 두면 전부 내보냅니다`;
+    const done = val => {
+      form.removeEventListener("submit", onSubmit);
+      dlg.removeEventListener("cancel", onCancel);
+      if (dlg.open) dlg.close();
+      resolve(val);
+    };
+    const onSubmit = e => {
+      if (e.submitter?.value === "confirm") {
+        done(parseRange(input.value, max) || [...Array(max).keys()]);
+      } else {
+        done(null);
+      }
+    };
+    const onCancel = () => done(null); // ESC
+    form.addEventListener("submit", onSubmit);
+    dlg.addEventListener("cancel", onCancel);
+    dlg.showModal();
+    input.focus();
+  });
+}
+
+async function exportPiece(p, kind, btn) {
   const root = $("print-root");
   if (!root) return;
   const label = btn ? btn.textContent : "";
@@ -790,54 +877,39 @@ async function downloadPdf(p, btn) {
     if (btn) { btn.disabled = true; btn.textContent = "만드는 중…"; }
     await loadPdfLibs();
     await document.fonts.ready;
-
-    // 미리보기 창의 실제 폭 그대로 조판 — 줄바꿈·자간이 화면과 완전히 일치
-    root.innerHTML = "";
-    const m = marginsOf(p);
-    const pvW = document.querySelector(".preview-pane")?.clientWidth
-      || document.querySelector(".workspace .paper")?.clientWidth || 460;
-    const docW = Math.max(320, pvW);
-    root.style.width = docW + "px";
-    const pages = splitPages(sanitizeHtml(p.html)).map(html => {
-      const pg = document.createElement("div");
-      pg.className = "print-page v-body";
-      pg.style.width = docW + "px";
-      pg.style.background = "#fff";
-      pg.style.lineHeight = p.lh || "1.85";
-      pg.style.letterSpacing = (p.ls || "0") + "em";
-      pg.style.padding =
-        `${m.mt || 26}px ${m.mr || 28}px ${m.mb || 26}px ${m.ml || 28}px`;
-      pg.innerHTML = html;
-      root.appendChild(pg);
-      layoutBoxes(pg);
-      fitBoxHeight(pg);
-      return pg;
-    });
-
-    const { jsPDF } = window.jspdf;
-    const W = 210; // PDF 폭은 A4 폭 기준, 높이는 페이지 내용 그대로
+    const { pages, docW } = buildExportPages(p);
+    const idxs = await askRange(pages.length);
+    if (!idxs) { root.innerHTML = ""; return; } // 취소
     const scale = Math.min(3, 1600 / docW); // 인쇄 화질 (~190dpi)
-    let pdf = null;
-
-    for (const page of pages) {
-      const canvas = await window.htmlToImage.toCanvas(page, {
-        pixelRatio: scale,
-        backgroundColor: "#ffffff",
-      });
-      const h = canvas.height * (W / canvas.width);
-      const opt = { unit: "mm", format: [W, h], orientation: W > h ? "l" : "p" };
-      if (!pdf) pdf = new jsPDF(opt);
-      else pdf.addPage([W, h], W > h ? "l" : "p");
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, W, h);
-    }
-    if (!pdf) throw new Error("빈 문서");
-
     const name = pieceTitle(p).replace(/[\\/:*?"<>|]/g, "_")
       .slice(0, 40).replace(/[.\s]+$/, "") || "조각글";
-    pdf.save(name + ".pdf");
+    const snap = el => window.htmlToImage.toCanvas(el, {
+      pixelRatio: scale, backgroundColor: "#ffffff",
+    });
+
+    if (kind === "pdf") {
+      const { jsPDF } = window.jspdf;
+      const W = 210; // PDF 폭은 A4 폭 기준, 높이는 페이지 내용 그대로
+      let pdf = null;
+      for (const i of idxs) {
+        const canvas = await snap(pages[i]);
+        const h = canvas.height * (W / canvas.width);
+        if (!pdf) pdf = new jsPDF({ unit: "mm", format: [W, h], orientation: W > h ? "l" : "p" });
+        else pdf.addPage([W, h], W > h ? "l" : "p");
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, W, h);
+      }
+      if (pdf) pdf.save(name + ".pdf");
+    } else {
+      for (const i of idxs) {
+        const canvas = await snap(pages[i]);
+        const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
+        const suffix = pages.length > 1 ? `-${i + 1}쪽` : "";
+        downloadBlob(blob, name + suffix + ".png");
+      }
+    }
     root.innerHTML = "";
   } catch (err) {
-    alert("PDF 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    alert("저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
     console.error(err);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = label; }
