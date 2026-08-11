@@ -775,8 +775,9 @@ function loadScript(src) {
 }
 
 async function loadPdfLibs() {
-  if (!window.html2canvas)
-    await loadScript("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js");
+  // html-to-image: 브라우저 렌더링을 SVG로 그대로 캡처 — 양쪽 정렬·형광 폭까지 화면과 동일
+  if (!window.htmlToImage)
+    await loadScript("https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js");
   if (!window.jspdf)
     await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
 }
@@ -819,7 +820,10 @@ async function downloadPdf(p, btn) {
     let pdf = null;
 
     for (const page of pages) {
-      const canvas = await window.html2canvas(page, { scale, backgroundColor: "#ffffff" });
+      const canvas = await window.htmlToImage.toCanvas(page, {
+        pixelRatio: scale,
+        backgroundColor: "#ffffff",
+      });
       const h = canvas.height * (W / canvas.width);
       const opt = { unit: "mm", format: [W, h], orientation: W > h ? "l" : "p" };
       if (!pdf) pdf = new jsPDF(opt);
