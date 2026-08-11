@@ -282,9 +282,9 @@ body {
   background: #eef0f2;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  margin: 18px -28px;
+  margin: 18px calc(0px - var(--pgm, 28px));
 }
-#v-body .pgbr { margin: 18px -26px; }
+#v-body .pgbr { margin: 18px calc(0px - var(--pgm, 26px)); }
 .doc-body .pgbr {
   position: relative;
   cursor: default;
