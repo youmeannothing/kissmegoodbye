@@ -744,9 +744,13 @@ function viewPiece(p) {
   if (vmode) vmode.hidden = false; // 토글은 항상 표시 — 나눔 없는 글은 1/1
   vb.style.lineHeight = p.lh || "1.85";
   vb.style.letterSpacing = (p.ls || "0") + "em";
-  setMargin(vb, marginsOf(p), 26);
-  dlg.style.width = p.width
-    ? Math.min(p.width + 54, Math.floor(window.innerWidth * 0.9)) + "px" : "";
+  // 상세보기의 내용 폭을 미리보기와 똑같이 — 미리보기·상세보기·PDF의 줄바꿈이 전부 일치
+  const mm = marginsOf(p);
+  setMargin(vb, { mt: mm.mt || 26, mb: mm.mb || 26, ml: mm.ml || 28, mr: mm.mr || 28 }, 28);
+  const pvW = document.querySelector(".preview-pane")?.clientWidth || 430;
+  const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+  const maxW = vw ? Math.floor(vw * 0.9) : pvW + 52;
+  dlg.style.width = Math.min(pvW + 52, maxW) + "px"; // +52 = 다이얼로그 자체 패딩
 
   $("v-edit").onclick = () => { dlg.close(); beginEdit(p); };
   $("v-download").onclick = () => downloadTxt(p);
