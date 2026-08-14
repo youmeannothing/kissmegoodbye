@@ -24,7 +24,7 @@ const body = () => $("f-body");
 // ——— HTML 정리 — 허용한 꾸밈만 남긴다 ———
 
 const ALLOWED_TAGS = new Set([
-  "B", "STRONG", "I", "EM", "U", "S", "STRIKE", "DEL",
+  "B", "STRONG", "I", "EM", "U", "S", "STRIKE", "DEL", "SUP", "SUB",
   "MARK", "BR", "DIV", "P", "SPAN", "IMG", "FONT",
 ]);
 
@@ -191,6 +191,40 @@ function savePieces(list) {
 }
 
 let editingId = null;
+let pageBgs = []; // 페이지별 배경색 (인덱스 = 페이지 번호-1, 비면 기본 흰색)
+
+// 커서가 있는 페이지 번호(0부터) — 앞에 있는 페이지 나눔 개수로 센다
+function cursorPageIndex() {
+  const sel = document.getSelection();
+  if (!sel.rangeCount || !body().contains(sel.anchorNode)) return 0;
+  let node = sel.anchorNode;
+  while (node.parentNode && node.parentNode !== body()) node = node.parentNode;
+  let idx = 0;
+  body().querySelectorAll(".pgbr").forEach(br => {
+    if (br.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) idx++;
+  });
+  return idx;
+}
+
+// 컨테이너의 페이지 구간별 배경을 그라디언트로 칠한다 (나눔 띠 위치 기준)
+function paintPageBgs(container, bgs) {
+  const bands = [...container.querySelectorAll(".pgbr")];
+  if (!bands.length) {
+    container.style.background = bgs[0] || "";
+    return;
+  }
+  const stops = [];
+  let prevY = 0;
+  bands.forEach((band, i) => {
+    const c = bgs[i] || "#ffffff";
+    const y = Math.max(prevY, band.offsetTop);
+    stops.push(`${c} ${prevY}px`, `${c} ${y}px`);
+    prevY = y;
+  });
+  const last = bgs[bands.length] || "#ffffff";
+  stops.push(`${last} ${prevY}px`, `${last} 100%`);
+  container.style.background = `linear-gradient(to bottom, ${stops.join(", ")})`;
+}
 
 // ——— 편집기 ———
 
@@ -539,7 +573,8 @@ function saveDraft() {
     return;
   }
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ html: body().innerHTML, ...docStyle }));
+    localStorage.setItem(DRAFT_KEY,
+      JSON.stringify({ html: body().innerHTML, ...docStyle, bgs: pageBgs }));
     $("draft-note").hidden = false;
   } catch { /* 저장 공간 부족 — 조용히 무시 */ }
 }
@@ -555,6 +590,8 @@ function restoreDraft() {
   docStyle.lh = draft.lh || "1.85";
   docStyle.ls = draft.ls || "0";
   Object.assign(docStyle, marginsOf(draft));
+  pageBgs = Array.isArray(draft.bgs) ? draft.bgs : [];
+  paintPageBgs(body(), pageBgs);
   $("draft-note").hidden = isDocEmpty();
 }
 
@@ -573,6 +610,8 @@ function renderPreviewPane() {
   if (pvPageIdx < 0) pvPageIdx = 0;
   pb.innerHTML = flip ? pages[pvPageIdx] : html;
   layoutBoxes(pb);
+  if (flip) pb.style.background = pageBgs[pvPageIdx] || "";
+  else paintPageBgs(pb, pageBgs);
   if (nav) nav.hidden = !flip;
   if (flip) {
     $("pv-ind").textContent = `${pvPageIdx + 1} / ${pages.length}`;
@@ -588,6 +627,7 @@ function afterEdit() {
   updateCharCount();
   refreshToolbarState();
   layoutBoxes(body());
+  paintPageBgs(body(), pageBgs);
   renderPreviewPane();
   fitBoxHeight(body(), 380);
   saveDraft();
@@ -598,6 +638,8 @@ function afterEdit() {
 function resetEditor() {
   body().innerHTML = "";
   editingId = null;
+  pageBgs = [];
+  body().style.background = "";
   localStorage.removeItem(DRAFT_KEY);
   $("draft-note").hidden = true;
   updateCharCount();
@@ -608,7 +650,7 @@ function resetEditor() {
 function savePiece() {
   if (isDocEmpty()) { body().focus(); return; }
   const html = sanitizeHtml(body().innerHTML);
-  const data = { html, ...docStyle };
+  const data = { html, ...docStyle, bgs: pageBgs };
   try {
     const list = loadPieces();
     if (editingId) {
@@ -635,6 +677,8 @@ function beginEdit(p) {
   docStyle.lh = p.lh || "1.85";
   docStyle.ls = p.ls || "0";
   Object.assign(docStyle, marginsOf(p));
+  pageBgs = Array.isArray(p.bgs) ? [...p.bgs] : [];
+  paintPageBgs(body(), pageBgs);
   syncDocInputs();
   applyDocStyle();
   updateCharCount();
@@ -715,6 +759,7 @@ function splitPages(html) {
 let viewMode = localStorage.getItem("kmg_viewmode") || "scroll";
 let viewPages = [];
 let viewPageIdx = 0;
+let viewBgs = [];
 
 function renderViewBody() {
   const vb = $("v-body");
@@ -723,6 +768,8 @@ function renderViewBody() {
   const flip = !!nav && viewMode === "flip";
   vb.innerHTML = flip ? viewPages[viewPageIdx] : viewPages.join('<div class="pgbr"></div>');
   layoutBoxes(vb);
+  if (flip) vb.style.background = viewBgs[viewPageIdx] || "";
+  else paintPageBgs(vb, viewBgs);
   if (nav) nav.hidden = !flip;
   if (flip) {
     $("pg-ind").textContent = `${viewPageIdx + 1} / ${viewPages.length}`;
@@ -740,6 +787,7 @@ function viewPiece(p) {
   const vb = $("v-body");
   viewPages = splitPages(sanitizeHtml(p.html));
   viewPageIdx = 0;
+  viewBgs = Array.isArray(p.bgs) ? p.bgs : [];
   const vmode = $("v-mode");
   if (vmode) vmode.hidden = false; // 토글은 항상 표시 — 나눔 없는 글은 1/1
   vb.style.lineHeight = p.lh || "1.85";
@@ -864,7 +912,7 @@ async function exportPiece(p, kind, btn) {
     pb.style.lineHeight = p.lh || "1.85";
     pb.style.letterSpacing = (p.ls || "0") + "em";
     setMargin(pb, marginsOf(p), 26);
-    pb.style.background = "#fff";
+    const bgs = Array.isArray(p.bgs) ? p.bgs : [];
 
     const docW = Math.max(1, pb.clientWidth);
     const scale = Math.min(3, 1600 / docW); // 인쇄 화질 (~190dpi)
@@ -875,6 +923,7 @@ async function exportPiece(p, kind, btn) {
     for (const i of idxs) {
       pb.innerHTML = pages[i];
       layoutBoxes(pb);
+      pb.style.background = bgs[i] || "#fff"; // 페이지별 배경색
       fitBoxHeight(pb);
       canvases.push([i, await window.htmlToImage.toCanvas(pb, {
         pixelRatio: scale, backgroundColor: "#ffffff",
@@ -1019,6 +1068,7 @@ function main() {
   // 형광펜·글자색 팔레트
   $("hl-btn").onclick = () => {
     $("fc-palette").hidden = true;
+    if ($("bg-palette")) $("bg-palette").hidden = true;
     $("hl-palette").hidden = !$("hl-palette").hidden;
   };
   $("hl-palette").addEventListener("click", e => {
@@ -1029,6 +1079,7 @@ function main() {
   });
   $("fc-btn").onclick = () => {
     $("hl-palette").hidden = true;
+    if ($("bg-palette")) $("bg-palette").hidden = true;
     $("fc-palette").hidden = !$("fc-palette").hidden;
   };
   $("fc-palette").addEventListener("click", e => {
@@ -1041,8 +1092,36 @@ function main() {
     if (!e.target.closest(".hl-wrap")) {
       $("hl-palette").hidden = true;
       $("fc-palette").hidden = true;
+      if ($("bg-palette")) $("bg-palette").hidden = true;
     }
   });
+
+  // 페이지 배경색 — 커서가 있는 페이지에 적용 (나눔 없으면 문서 전체)
+  if ($("bg-btn")) {
+    const applyPageBg = color => {
+      const idx = cursorPageIndex();
+      if (color) pageBgs[idx] = color;
+      else delete pageBgs[idx];
+      afterEdit();
+    };
+    $("bg-btn").onclick = () => {
+      $("hl-palette").hidden = true;
+      $("fc-palette").hidden = true;
+      $("bg-palette").hidden = !$("bg-palette").hidden;
+    };
+    $("bg-palette").addEventListener("click", e => {
+      const sw = e.target.closest("button[data-bg]");
+      if (!sw) return;
+      applyPageBg(sw.dataset.bg);
+      $("bg-palette").hidden = true;
+    });
+    const bgWheel = $("bg-color");
+    bgWheel.addEventListener("input", () => applyPageBg(bgWheel.value));
+    bgWheel.addEventListener("change", () => {
+      applyPageBg(bgWheel.value);
+      $("bg-palette").hidden = true;
+    });
+  }
 
   // 직접 고르기 (컬러 휠) — OS 피커가 포커스를 가져가도 동작하도록
   // 기억해 둔 선택 영역을 span으로 직접 감싸고, 고르는 동안은 그 span의 색만 바꾼다
