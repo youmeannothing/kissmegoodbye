@@ -372,7 +372,7 @@ body {
 .doc-body font[size="6"], .v-body font[size="6"] { font-size: 18px; }
 .doc-body font[size="7"], .v-body font[size="7"] { font-size: 22px; }
 .doc-body sup, .v-body sup, .doc-body sub, .v-body sub {
-  font-size: 0.65em; /* 위·아래 첨자는 본문의 65% */
+  font-size: 0.72em; /* 위·아래 첨자는 본문의 72% */
 }
 .doc-body img, .v-body img {
   max-width: 100%;
